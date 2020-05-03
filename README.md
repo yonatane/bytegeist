@@ -1,6 +1,10 @@
 # bytegeist
 
-Schemas for binary data
+Binary protocol specs for clojure
+
+WIP
+
+Goal: [malli](https://github.com/metosin/malli)-like flexible specs for byte codecs
 
 ## License
 

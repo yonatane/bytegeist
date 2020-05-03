@@ -1,5 +1,5 @@
 (defproject bytegeist "0.1.0-SNAPSHOT"
-  :description "Schemas for binary data"
+  :description "Binary protocol specs for clojure"
   :url "https://github.com/yonatane/bytegeist"
   :license {:name "MIT License"}
   :dependencies [[org.clojure/clojure "1.10.1"]

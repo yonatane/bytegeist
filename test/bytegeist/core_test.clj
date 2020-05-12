@@ -55,25 +55,27 @@
             b (Unpooled/buffer 4 4)
             v 1]
         (g/write s b v)
-        (is (= v (g/read s b)))))
-    (testing "nullable-string nil"
-      (let [^g/Spec s nullable-string
-            b (Unpooled/buffer 2 2)
-            v nil]
-        (g/write s b v)
-        (is (= v (g/read s b)))))
-    (testing "nullable-string empty"
-      (let [^g/Spec s nullable-string
-            b (Unpooled/buffer 2 2)
-            v ""]
-        (g/write s b v)
-        (is (= v (g/read s b)))))
-    (testing "nullable-string non-empty"
-      (let [^g/Spec s nullable-string
-            b (Unpooled/buffer)
-            v "a b c"]
-        (g/write s b v)
         (is (= v (g/read s b)))))))
+
+(deftest nullable-string-test
+  (testing "nullable-string nil"
+    (let [^g/Spec s nullable-string
+          b (Unpooled/buffer 2 2)
+          v nil]
+      (g/write s b v)
+      (is (= v (g/read s b)))))
+  (testing "nullable-string empty"
+    (let [^g/Spec s nullable-string
+          b (Unpooled/buffer 2 2)
+          v ""]
+      (g/write s b v)
+      (is (= v (g/read s b)))))
+  (testing "nullable-string non-empty"
+    (let [^g/Spec s nullable-string
+          b (Unpooled/buffer)
+          v "a b c"]
+      (g/write s b v)
+      (is (= v (g/read s b))))))
 
 (deftest map-write-and-read
   (testing "with int32"
@@ -84,11 +86,14 @@
       (is (= v (g/read s b)))))
   (testing "nested map"
     (let [s (g/spec [:map
-                             [:a :int32]
-                             [:m [:map
-                                  [:nested :int16]]]])
+                     [:a :int32]
+                     [:m [:map
+                          [:nested :int16]]]])
           b (Unpooled/buffer)
           v {:a 1
              :m {:nested 2}}]
       (g/write s b v)
       (is (= v (g/read s b))))))
+
+(deftest length-field-based-frame
+  (is (= true false) "Implement!"))

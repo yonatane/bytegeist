@@ -96,6 +96,7 @@
   (write [_ b v] "Relative write and increment the index"))
 
 ;TODO have a protocol for ByteBuf to avoid type hints
+;TODO non-yielding fields that increment the index but aren't returned on read.
 
 (def int16
   (reify

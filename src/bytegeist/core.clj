@@ -10,13 +10,19 @@
     (first s)
     (throw (IllegalArgumentException. "Only supporting vectors currently"))))
 
+(defn- shape-spec?
+  [s]
+  (vector? s))
+
 (defn- map-shape?
   [s]
-  (= :map (shape s)))
+  (and (shape-spec? s)
+       (= :map (shape s))))
 
 (defn- vector-shape?
   [s]
-  (= :vector (shape s)))
+  (and (shape-spec? s)
+       (= :vector (shape s))))
 
 (defn- append
   [s fields]
@@ -50,7 +56,7 @@
   [coll field]
   (some #{(field-name field)} (map field-name coll)))
 
-(defn map-add-fields
+(defn- map-add-fields
   [s fields]
   (let [; Ordered normalized fields
         all-ordered
@@ -73,7 +79,8 @@
 
     (into [:map] final-fields)))
 
-(defn add-fields [s fields]
+(defn add-fields
+  [s fields]
   (cond
     (map-shape? s)
     (map-add-fields s fields)
@@ -105,3 +112,42 @@
       (.readInt ^ByteBuf b))
     (write [_ b v]
       (.writeInt ^ByteBuf b (int v)))))
+
+(def registry
+  {:int16 int16
+   :int32 int32})
+
+(declare spec)
+
+(defn- compile-field
+  [[field-name field-spec]]
+  [field-name (spec field-spec)])
+
+(defn map-spec
+  [s]
+  (let [compiled-fields (mapv compile-field (map-fields s))]
+    (reify
+      Spec
+      (read [_ b]
+        (into {}
+              (map (fn [[field-name field-spec]]
+                     [field-name (read field-spec ^ByteBuf b)]))
+              compiled-fields))
+      (write [_ b v]
+        (run! (fn [[field-name field-spec]]
+                (write field-spec b (clojure.core/get v field-name)))
+              compiled-fields)))))
+
+(defn spec [s]
+  (cond
+    (satisfies? Spec s)
+    s
+
+    (keyword? s)
+    (clojure.core/get registry s)
+
+    (map-shape? s)
+    (map-spec s)
+
+    (vector-shape? s)
+    (throw (IllegalArgumentException. "Vector spec not implemented yet"))))

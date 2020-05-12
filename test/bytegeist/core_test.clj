@@ -42,7 +42,7 @@
                       [:b :int16]]]
       (is (= literal-v1 v1)))))
 
-(deftest write-and-read
+(deftest primitive-write-and-read
   (testing "primitives"
     (testing "int16"
       (let [^g/Spec s g/int16
@@ -73,8 +73,22 @@
             b (Unpooled/buffer)
             v "a b c"]
         (g/write s b v)
-        (is (= v (g/read s b))))))
-  (testing "map"
-    (testing "with int32"
-      (let [s [:map [:a :int32]]]
-        (is (= true false) "TODO")))))
+        (is (= v (g/read s b)))))))
+
+(deftest map-write-and-read
+  (testing "with int32"
+    (let [s (g/spec [:map [:a :int32]])
+          b (Unpooled/buffer)
+          v {:a 1}]
+      (g/write s b v)
+      (is (= v (g/read s b)))))
+  (testing "nested map"
+    (let [s (g/spec [:map
+                             [:a :int32]
+                             [:m [:map
+                                  [:nested :int16]]]])
+          b (Unpooled/buffer)
+          v {:a 1
+             :m {:nested 2}}]
+      (g/write s b v)
+      (is (= v (g/read s b))))))

@@ -1,5 +1,5 @@
 (ns bytegeist.core-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clojure.test :refer [deftest testing is are]]
             [bytegeist.core :as g])
   (:import (io.netty.buffer Unpooled ByteBuf)
            (java.nio.charset StandardCharsets)))
@@ -43,19 +43,23 @@
       (is (= literal-v1 v1)))))
 
 (deftest primitive-write-and-read
-  (testing "primitives"
-    (testing "int16"
-      (let [^g/Spec s g/int16
-            b (Unpooled/buffer 2 2)
-            v 1]
-        (g/write s b v)
-        (is (= v (g/read s b)))))
-    (testing "int32"
-      (let [^g/Spec s g/int32
-            b (Unpooled/buffer 4 4)
-            v 1]
-        (g/write s b v)
-        (is (= v (g/read s b)))))))
+  (are [num-bytes s i v] (let [b (Unpooled/buffer num-bytes num-bytes)]
+                           (g/write s b i)
+                           (= v (g/read s b)))
+    1 g/bool true true
+    1 g/bool false false
+    1 g/byte -128 -128
+    1 g/byte 0 0
+    1 g/byte 127 127
+    1 g/byte 128 -128
+    1 g/byte -129 127
+    1 g/ubyte 0 0
+    1 g/ubyte 255 255
+    1 g/ubyte -1 255
+    2 g/int16 1 1
+    3 g/int24 1 1
+    4 g/int32 1 1
+    8 g/int64 1 1))
 
 (deftest nullable-string-test
   (testing "nullable-string nil"
@@ -94,6 +98,3 @@
              :m {:nested 2}}]
       (g/write s b v)
       (is (= v (g/read s b))))))
-
-(deftest length-field-based-frame
-  (is (= true false) "Implement!"))

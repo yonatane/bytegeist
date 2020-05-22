@@ -1,5 +1,5 @@
 (ns bytegeist.core
-  (:refer-clojure :exclude [get read set])
+  (:refer-clojure :exclude [byte get read set])
   (:import (io.netty.buffer ByteBuf)
            (java.nio ByteBuffer)
            (java.nio.charset StandardCharsets)))
@@ -95,10 +95,41 @@
   (read [_ b] "Relative read and increment the index")
   (write [_ b v] "Relative write and increment the index"))
 
-;TODO have a protocol for ByteBuf to avoid type hints
 ;TODO non-yielding fields that increment the index but aren't returned on read.
 
+(def bool
+  (reify
+    Spec
+    (read [_ b]
+      (.readBoolean ^ByteBuf b))
+    (write [_ b v]
+      (.writeBoolean ^ByteBuf b (boolean v)))))
+
+(def byte
+  (reify
+    Spec
+    (read [_ b]
+      (.readByte ^ByteBuf b))
+    (write [_ b v]
+      (.writeByte ^ByteBuf b (int v)))))
+
+(def ubyte
+  (reify
+    Spec
+    (read [_ b]
+      (.readUnsignedByte ^ByteBuf b))
+    (write [_ b v]
+      (.writeByte ^ByteBuf b (int v)))))
+
 (def int16
+  (reify
+    Spec
+    (read [_ b]
+      (.readShort ^ByteBuf b))
+    (write [_ b v]
+      (.writeShort ^ByteBuf b (int v)))))
+
+(def int24
   (reify
     Spec
     (read [_ b]
@@ -114,9 +145,27 @@
     (write [_ b v]
       (.writeInt ^ByteBuf b (int v)))))
 
+(def int64
+  (reify
+    Spec
+    (read [_ b]
+      (.readLong ^ByteBuf b))
+    (write [_ b v]
+      (.writeLong ^ByteBuf b (long v)))))
+
 (def registry
-  {:int16 int16
-   :int32 int32})
+  {:bool bool
+   :boolean bool
+   :byte byte
+   :ubyte ubyte
+   :unsigned-byte ubyte
+   :int16 int16
+   :int24 int24
+   :int32 int32
+   :int int32
+   :int64 int64
+   :long int64
+   })
 
 (declare spec)
 

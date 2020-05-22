@@ -82,7 +82,9 @@
       1 g/ubyte (inc max-ubyte) 0
       1 g/ubyte -1 max-ubyte
       4 g/uint32 (inc max-uint) 0
-      4 g/uint32 -1 max-uint)))
+      4 g/uint32 -1 max-uint
+      1 g/uvarint32 0 0
+      1 g/uvarint32 Byte/MAX_VALUE Byte/MAX_VALUE)))
 
 (deftest nullable-string-test
   (testing "nullable-string nil"

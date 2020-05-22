@@ -161,18 +161,27 @@
     (write [_ b v]
       (.writeInt ^ByteBuf b (unchecked-int v)))))
 
+(def uvarint32
+  (reify
+    Spec
+    (read [_ b]
+      (bytegeist.protobuf.Util/readUnsignedVarint32 ^ByteBuf b))
+    (write [_ b v]
+      (bytegeist.protobuf.Util/writeUnsignedVarint32 ^ByteBuf b (unchecked-int v)))))
+
 (def registry
   {:bool bool
    :boolean bool
    :byte byte
-   :ubyte ubyte
-   :unsigned-byte ubyte
    :int16 int16
    :int24 int24
    :int32 int32
    :int int32
    :int64 int64
    :long int64
+   :ubyte ubyte
+   :uint32 uint32
+   :uvarint32 uvarint32
    })
 
 (declare spec)

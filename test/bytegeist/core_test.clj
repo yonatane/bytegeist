@@ -8,6 +8,7 @@
 (def max-int24 8388607)
 (def min-int24 -8388608)
 (def max-uint (-> Integer/MAX_VALUE inc (* 2) dec))
+(defn max-uvarint [num-bytes] (long (dec (Math/pow 2 (* 7 num-bytes)))))
 
 (def nullable-string
   (reify
@@ -70,21 +71,38 @@
       8 g/int64 Long/MAX_VALUE
       8 g/int64 Long/MIN_VALUE))
 
-  (testing "unsigned"
+  (testing "unsigned within range"
     (are [num-bytes s v] (let [b (Unpooled/buffer num-bytes num-bytes)]
-                             (g/write s b v)
-                             (= v (g/read s b)))
+                           (g/write s b v)
+                           (= v (g/read s b)))
       1 g/ubyte max-ubyte
-      4 g/uint32 max-uint)
+      4 g/uint32 max-uint
+      1 g/uvarint32 0
+      1 g/uvarint32 (max-uvarint 1)
+      2 g/uvarint32 (max-uvarint 2)
+      3 g/uvarint32 (max-uvarint 3)
+      4 g/uvarint32 (max-uvarint 4)))
+  (testing "unsigned wrap"
     (are [num-bytes s w r] (let [b (Unpooled/buffer num-bytes num-bytes)]
-                           (g/write s b w)
-                           (= r (g/read s b)))
+                             (g/write s b w)
+                             (= r (g/read s b)))
       1 g/ubyte (inc max-ubyte) 0
       1 g/ubyte -1 max-ubyte
       4 g/uint32 (inc max-uint) 0
-      4 g/uint32 -1 max-uint
-      1 g/uvarint32 0 0
-      1 g/uvarint32 Byte/MAX_VALUE Byte/MAX_VALUE)))
+      4 g/uint32 -1 max-uint))
+  (testing "uvarint out of bounds"
+    (is (thrown? Exception
+                 (let [b (Unpooled/buffer 1 1)]
+                   (g/write g/uvarint32 b (inc (max-uvarint 1))))))
+    (is (thrown? Exception
+                 (let [b (Unpooled/buffer 2 2)]
+                   (g/write g/uvarint32 b (inc (max-uvarint 2))))))
+    (is (thrown? Exception
+                 (let [b (Unpooled/buffer 3 3)]
+                   (g/write g/uvarint32 b (inc (max-uvarint 3))))))
+    (is (thrown? Exception
+                 (let [b (Unpooled/buffer 4 4)]
+                   (g/write g/uvarint32 b (inc (max-uvarint 4))))))))
 
 (deftest nullable-string-test
   (testing "nullable-string nil"

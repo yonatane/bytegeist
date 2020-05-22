@@ -4,6 +4,11 @@
   (:import (io.netty.buffer Unpooled ByteBuf)
            (java.nio.charset StandardCharsets)))
 
+(def max-ubyte (-> Byte/MAX_VALUE inc (* 2) dec))
+(def max-int24 8388607)
+(def min-int24 -8388608)
+(def max-uint (-> Integer/MAX_VALUE inc (* 2) dec))
+
 (def nullable-string
   (reify
     g/Spec
@@ -43,23 +48,41 @@
       (is (= literal-v1 v1)))))
 
 (deftest primitive-write-and-read
-  (are [num-bytes s i v] (let [b (Unpooled/buffer num-bytes num-bytes)]
-                           (g/write s b i)
+  (testing "boolean"
+    (are [v] (let [b (Unpooled/buffer 1 1)]
+               (g/write g/bool b v)
+               (= v (g/read g/bool b)))
+      true
+      false))
+
+  (testing "signed"
+    (are [num-bytes s v] (let [b (Unpooled/buffer num-bytes num-bytes)]
+                           (g/write s b v)
                            (= v (g/read s b)))
-    1 g/bool true true
-    1 g/bool false false
-    1 g/byte -128 -128
-    1 g/byte 0 0
-    1 g/byte 127 127
-    1 g/byte 128 -128
-    1 g/byte -129 127
-    1 g/ubyte 0 0
-    1 g/ubyte 255 255
-    1 g/ubyte -1 255
-    2 g/int16 1 1
-    3 g/int24 1 1
-    4 g/int32 1 1
-    8 g/int64 1 1))
+      1 g/byte Byte/MAX_VALUE
+      1 g/byte Byte/MIN_VALUE
+      2 g/int16 Short/MAX_VALUE
+      2 g/int16 Short/MIN_VALUE
+      3 g/int24 max-int24
+      3 g/int24 min-int24
+      4 g/int32 Integer/MAX_VALUE
+      4 g/int32 Integer/MIN_VALUE
+      8 g/int64 Long/MAX_VALUE
+      8 g/int64 Long/MIN_VALUE))
+
+  (testing "unsigned"
+    (are [num-bytes s v] (let [b (Unpooled/buffer num-bytes num-bytes)]
+                             (g/write s b v)
+                             (= v (g/read s b)))
+      1 g/ubyte max-ubyte
+      4 g/uint32 max-uint)
+    (are [num-bytes s w r] (let [b (Unpooled/buffer num-bytes num-bytes)]
+                           (g/write s b w)
+                           (= r (g/read s b)))
+      1 g/ubyte (inc max-ubyte) 0
+      1 g/ubyte -1 max-ubyte
+      4 g/uint32 (inc max-uint) 0
+      4 g/uint32 -1 max-uint)))
 
 (deftest nullable-string-test
   (testing "nullable-string nil"

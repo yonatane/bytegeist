@@ -111,15 +111,7 @@
     (read [_ b]
       (.readByte ^ByteBuf b))
     (write [_ b v]
-      (.writeByte ^ByteBuf b (int v)))))
-
-(def ubyte
-  (reify
-    Spec
-    (read [_ b]
-      (.readUnsignedByte ^ByteBuf b))
-    (write [_ b v]
-      (.writeByte ^ByteBuf b (int v)))))
+      (.writeByte ^ByteBuf b (unchecked-int v)))))
 
 (def int16
   (reify
@@ -127,15 +119,15 @@
     (read [_ b]
       (.readShort ^ByteBuf b))
     (write [_ b v]
-      (.writeShort ^ByteBuf b (int v)))))
+      (.writeShort ^ByteBuf b (unchecked-int v)))))
 
 (def int24
   (reify
     Spec
     (read [_ b]
-      (.readShort ^ByteBuf b))
+      (.readMedium ^ByteBuf b))
     (write [_ b v]
-      (.writeShort ^ByteBuf b (int v)))))
+      (.writeMedium ^ByteBuf b (unchecked-int v)))))
 
 (def int32
   (reify
@@ -143,7 +135,7 @@
     (read [_ b]
       (.readInt ^ByteBuf b))
     (write [_ b v]
-      (.writeInt ^ByteBuf b (int v)))))
+      (.writeInt ^ByteBuf b (unchecked-int v)))))
 
 (def int64
   (reify
@@ -151,7 +143,23 @@
     (read [_ b]
       (.readLong ^ByteBuf b))
     (write [_ b v]
-      (.writeLong ^ByteBuf b (long v)))))
+      (.writeLong ^ByteBuf b (unchecked-long v)))))
+
+(def ubyte
+  (reify
+    Spec
+    (read [_ b]
+      (.readUnsignedByte ^ByteBuf b))
+    (write [_ b v]
+      (.writeByte ^ByteBuf b (unchecked-int v)))))
+
+(def uint32
+  (reify
+    Spec
+    (read [_ b]
+      (.readUnsignedInt ^ByteBuf b))
+    (write [_ b v]
+      (.writeInt ^ByteBuf b (unchecked-int v)))))
 
 (def registry
   {:bool bool

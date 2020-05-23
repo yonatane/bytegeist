@@ -125,19 +125,26 @@
       (is (= v (g/read s b))))))
 
 (deftest map-write-and-read
-  (testing "with int32"
-    (let [s (g/spec [:map [:a :int32]])
-          b (Unpooled/buffer)
-          v {:a 1}]
-      (g/write s b v)
-      (is (= v (g/read s b)))))
-  (testing "nested map"
-    (let [s (g/spec [:map
-                     [:a :int32]
-                     [:m [:map
-                          [:nested :int16]]]])
-          b (Unpooled/buffer)
-          v {:a 1
-             :m {:nested 2}}]
-      (g/write s b v)
-      (is (= v (g/read s b))))))
+  (are [s v] (let [b (Unpooled/buffer)]
+               (g/write s b v)
+               (= v (g/read s b)))
+    (g/spec [:map [:a :int32]])
+    {:a 1}
+
+    (g/spec [:map
+             [:a :int32]
+             [:m [:map [:b :int16]]]])
+    {:a 1
+     :m {:b 2}}
+
+    (g/spec [:map
+             [:a :int32]
+             [:b :uint32]
+             [:m [:map
+                  [:b :uint32]
+                  [:c :int24]]]])
+    {:a 1
+     :b 2
+     :m {:b (max-uvarint 3)
+         :c max-int24}}
+    ))

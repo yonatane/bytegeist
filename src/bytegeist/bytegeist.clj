@@ -1,4 +1,4 @@
-(ns bytegeist.core
+(ns bytegeist.bytegeist
   (:refer-clojure :exclude [byte get read set])
   (:import (io.netty.buffer ByteBuf)
            (java.nio ByteBuffer)

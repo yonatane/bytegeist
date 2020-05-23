@@ -1,6 +1,6 @@
-(ns bytegeist.core-test
+(ns bytegeist.bytegeist-test
   (:require [clojure.test :refer [deftest testing is are]]
-            [bytegeist.core :as g])
+            [bytegeist.bytegeist :as g])
   (:import (io.netty.buffer Unpooled ByteBuf)
            (java.nio.charset StandardCharsets)))
 

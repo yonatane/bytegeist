@@ -198,12 +198,26 @@
       (read [_ b]
         (into {}
               (map (fn [[field-name field-spec]]
-                     [field-name (read field-spec ^ByteBuf b)]))
+                     [field-name (read field-spec b)]))
               compiled-fields))
       (write [_ b v]
         (run! (fn [[field-name field-spec]]
                 (write field-spec b (clojure.core/get v field-name)))
               compiled-fields)))))
+
+(defn vector-spec
+  [s]
+  (let [specs (mapv spec (rest s))]
+    (reify
+      Spec
+      (read [_ b]
+        (mapv (fn [item-spec] (read item-spec b)) specs))
+      (write [_ b v]
+        (loop [i 0]
+          (when (< i (count specs))
+            (let [item-spec (nth specs i) item (nth v i)]
+              (write item-spec b item)
+              (recur (inc i)))))))))
 
 (defn spec [s]
   (cond
@@ -217,4 +231,4 @@
     (map-spec s)
 
     (vector-shape? s)
-    (throw (IllegalArgumentException. "Vector spec not implemented yet"))))
+    (vector-spec s)))

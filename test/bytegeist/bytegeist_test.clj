@@ -48,7 +48,7 @@
                       [:b :int16]]]
       (is (= literal-v1 v1)))))
 
-(deftest primitive-write-and-read
+(deftest primitive-write-read
   (testing "boolean"
     (are [v] (let [b (Unpooled/buffer 1 1)]
                (g/write g/bool b v)
@@ -124,7 +124,16 @@
       (g/write s b v)
       (is (= v (g/read s b))))))
 
-(deftest map-write-and-read
+(deftest vector-write-read
+  (are [s v] (let [b (Unpooled/buffer)]
+               (g/write s b v)
+               (= v (g/read s b)))
+    (g/spec [:vector :bool])
+    [true]
+    (g/spec [:vector :uvarint32 :bool :int24 [:map [:a [:vector :int32 :uint32]]]])
+    [(max-uvarint 2) false max-int24 {:a [0 max-uint]}]))
+
+(deftest map-write-read
   (are [s v] (let [b (Unpooled/buffer)]
                (g/write s b v)
                (= v (g/read s b)))
@@ -146,5 +155,4 @@
     {:a 1
      :b 2
      :m {:b (max-uvarint 3)
-         :c max-int24}}
-    ))
+         :c max-int24}}))

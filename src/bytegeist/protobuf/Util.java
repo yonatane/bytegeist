@@ -40,4 +40,21 @@ public class Util {
             }
         }
     }
+
+    // Copied from com.google.protobuf.CodedOutputStream.computeUInt32SizeNoTag
+    public static int sizeUnsignedVarint32(final int value) {
+        if ((value & (~0 << 7)) == 0) {
+            return 1;
+        }
+        if ((value & (~0 << 14)) == 0) {
+            return 2;
+        }
+        if ((value & (~0 << 21)) == 0) {
+            return 3;
+        }
+        if ((value & (~0 << 28)) == 0) {
+            return 4;
+        }
+        return 5;
+    }
 }

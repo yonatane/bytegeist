@@ -185,11 +185,30 @@
       (write [_ b v]
         (run! #(write item-spec b %) v)))))
 
+(defn length-delimited-vector-spec
+  [delimiter-spec item-spec offset]
+  (let [offset (or offset 0)]
+    (reify
+      Spec
+      (read [_ b]
+        (let [len (- (read delimiter-spec b) offset)]
+          (if (< len 0)
+            nil
+            (vec (repeatedly len #(read item-spec ^ByteBuf b))))))
+      (write [_ b v]
+        (if (nil? v)
+          (write delimiter-spec b (dec offset))
+          (do (write delimiter-spec b (+ (count v) offset))
+              (run! #(write item-spec b %) v)))))))
+
 (defn vector-spec
-  [[_ length item-spec]]
+  [[_ length item-spec offset]]
   (cond
     (int? length)
-    (fixed-length-vector-spec length item-spec)))
+    (fixed-length-vector-spec length item-spec)
+
+    :else
+    (length-delimited-vector-spec (spec length) (spec item-spec) offset)))
 
 
 (defn fixed-length-string-spec

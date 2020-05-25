@@ -103,7 +103,7 @@
       :uvarint32 ""
       :uvarint32 "uvarint-delimited"))
 
-  (testing "-1 Offset"
+  (testing "Offset 1"
     (are [delimeter v] (let [s (g/spec [:string delimeter 1])
                              b (Unpooled/buffer)]
                          (g/write s b v)
@@ -127,11 +127,32 @@
     [(max-uvarint 2) false max-int24 {:a [0 max-uint]}]))
 
 (deftest vector-write-read
-  (are [s v] (let [b (Unpooled/buffer)]
-               (g/write s b v)
-               (= v (g/read s b)))
-    (g/spec [:vector 3 :bool])
-    [true false true]))
+  (are [spec-data v] (let [s (g/spec spec-data)
+                           b (Unpooled/buffer)]
+                       (g/write s b v)
+                       (= v (g/read s b)))
+    [:vector 3 :bool]
+    [true false true]
+
+    [:vector :short :bool]
+    nil
+
+    [:vector :short :bool]
+    []
+
+    [:vector :short :bool]
+    [true false true]
+
+    [:vector :uvarint32 :uvarint32 1]
+    nil
+
+    [:vector :uvarint32 :uvarint32 1]
+    []
+
+    [:vector :uvarint32 :uvarint32 1]
+    [0 (max-uvarint 1) (max-uvarint 2) (max-uvarint 3) (max-uvarint 4)]))
+
+
 
 (deftest map-write-read
   (are [s v] (let [b (Unpooled/buffer)]

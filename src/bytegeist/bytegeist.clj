@@ -175,6 +175,23 @@
               (write item-spec b item)
               (recur (inc i)))))))))
 
+(defn fixed-length-vector-spec
+  [length item-spec]
+  (let [item-spec (spec item-spec)]
+    (reify
+      Spec
+      (read [_ b]
+        (vec (repeatedly length #(read item-spec ^ByteBuf b))))
+      (write [_ b v]
+        (run! #(write item-spec b %) v)))))
+
+(defn vector-spec
+  [[_ length item-spec]]
+  (cond
+    (int? length)
+    (fixed-length-vector-spec length item-spec)))
+
+
 (defn fixed-length-string-spec
   [length]
   (reify
@@ -229,6 +246,7 @@
 
 (def f-registry
   {:map map-spec
+   :vector vector-spec
    :tuple tuple-spec
    :string string-spec})
 

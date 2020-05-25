@@ -116,14 +116,22 @@
       :uvarint32 ""
       :uvarint32 "uvarint-delimited")))
 
-(deftest vector-write-read
+(deftest tuple-write-read
   (are [s v] (let [b (Unpooled/buffer)]
                (g/write s b v)
                (= v (g/read s b)))
     (g/spec [:tuple :bool])
     [true]
+
     (g/spec [:tuple :uvarint32 :bool :int24 [:map [:a [:tuple :int32 :uint32]]]])
     [(max-uvarint 2) false max-int24 {:a [0 max-uint]}]))
+
+(deftest vector-write-read
+  (are [s v] (let [b (Unpooled/buffer)]
+               (g/write s b v)
+               (= v (g/read s b)))
+    (g/spec [:vector 3 :bool])
+    [true false true]))
 
 (deftest map-write-read
   (are [s v] (let [b (Unpooled/buffer)]

@@ -20,10 +20,6 @@
   [field]
   (cond-> field (override? field) remove-override-tag))
 
-(defn- vector-add-fields
-  [s fields]
-  (throw (Exception. "vector-add-fields not implemented yet")))
-
 (defn- map-fields
   [s]
   (rest s))
@@ -165,7 +161,7 @@
                 (write field-spec b (clojure.core/get v field-name)))
               compiled-fields)))))
 
-(defn vector-spec
+(defn tuple-spec
   [s]
   (let [specs (mapv spec (rest s))]
     (reify
@@ -233,7 +229,7 @@
 
 (def f-registry
   {:map map-spec
-   :vector vector-spec
+   :tuple tuple-spec
    :string string-spec})
 
 (defn compile-spec-vector

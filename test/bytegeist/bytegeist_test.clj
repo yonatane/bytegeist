@@ -120,9 +120,9 @@
   (are [s v] (let [b (Unpooled/buffer)]
                (g/write s b v)
                (= v (g/read s b)))
-    (g/spec [:vector :bool])
+    (g/spec [:tuple :bool])
     [true]
-    (g/spec [:vector :uvarint32 :bool :int24 [:map [:a [:vector :int32 :uint32]]]])
+    (g/spec [:tuple :uvarint32 :bool :int24 [:map [:a [:tuple :int32 :uint32]]]])
     [(max-uvarint 2) false max-int24 {:a [0 max-uint]}]))
 
 (deftest map-write-read

@@ -1,29 +1,13 @@
 (ns bytegeist.bytegeist-test
   (:require [clojure.test :refer [deftest testing is are]]
             [bytegeist.bytegeist :as g])
-  (:import (io.netty.buffer Unpooled ByteBuf)
-           (java.nio.charset StandardCharsets)))
+  (:import (io.netty.buffer Unpooled)))
 
 (def max-ubyte (-> Byte/MAX_VALUE inc (* 2) dec))
 (def max-int24 8388607)
 (def min-int24 -8388608)
 (def max-uint (-> Integer/MAX_VALUE inc (* 2) dec))
 (defn max-uvarint [num-bytes] (long (dec (Math/pow 2 (* 7 num-bytes)))))
-
-(def nullable-string
-  (reify
-    g/Spec
-    (read [_ b]
-      (let [len (.readShort ^ByteBuf b)]
-        (if (< len 0)
-          nil
-          (.readCharSequence ^ByteBuf b len StandardCharsets/UTF_8))))
-    (write [_ b v]
-      (if (nil? v)
-        (.writeShort ^ByteBuf b (int -1))
-        (let [byts (.getBytes ^String v StandardCharsets/UTF_8)]
-          (.writeShort ^ByteBuf b (int (alength byts)))
-          (.writeBytes ^ByteBuf b byts))))))
 
 (def message
   [:map
@@ -37,7 +21,7 @@
 
 (def request-header-v1
   (-> request-header-v0
-      (g/add-fields [[:client-id nullable-string]])))
+      (g/add-fields [[:client-id [:string :short]]])))
 
 (deftest spec
   (testing "Spec new version from previous"
@@ -104,25 +88,33 @@
                  (let [b (Unpooled/buffer 4 4)]
                    (g/write g/uvarint32 b (inc (max-uvarint 4))))))))
 
-(deftest nullable-string-test
-  (testing "nullable-string nil"
-    (let [^g/Spec s nullable-string
-          b (Unpooled/buffer 2 2)
-          v nil]
-      (g/write s b v)
-      (is (= v (g/read s b)))))
-  (testing "nullable-string empty"
-    (let [^g/Spec s nullable-string
-          b (Unpooled/buffer 2 2)
-          v ""]
-      (g/write s b v)
-      (is (= v (g/read s b)))))
-  (testing "nullable-string non-empty"
-    (let [^g/Spec s nullable-string
-          b (Unpooled/buffer)
-          v "a b c"]
-      (g/write s b v)
-      (is (= v (g/read s b))))))
+(deftest string-test
+  (testing "No offset"
+    (are [length v] (let [s (g/spec [:string length])
+                          b (Unpooled/buffer)]
+                      (g/write s b v)
+                      (= v (g/read s b)))
+      0 ""
+      3 "abc"
+      :short nil
+      :short ""
+      :short "short-delimited"
+      :int "int-delimited"
+      :uvarint32 ""
+      :uvarint32 "uvarint-delimited"))
+
+  (testing "-1 Offset"
+    (are [delimeter v] (let [s (g/spec [:string delimeter 1])
+                             b (Unpooled/buffer)]
+                         (g/write s b v)
+                         (= v (g/read s b)))
+      :short nil
+      :short ""
+      :short "short-delimited"
+      :int "int-delimited"
+      :uvarint32 nil
+      :uvarint32 ""
+      :uvarint32 "uvarint-delimited")))
 
 (deftest vector-write-read
   (are [s v] (let [b (Unpooled/buffer)]

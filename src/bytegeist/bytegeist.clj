@@ -4,26 +4,6 @@
            (java.nio ByteBuffer)
            (java.nio.charset StandardCharsets)))
 
-(defn- shape
-  [s]
-  (if (vector? s)
-    (first s)
-    (throw (IllegalArgumentException. "Only supporting vectors currently"))))
-
-(defn- shape-spec?
-  [s]
-  (vector? s))
-
-(defn- map-shape?
-  [s]
-  (and (shape-spec? s)
-       (= :map (shape s))))
-
-(defn- vector-shape?
-  [s]
-  (and (shape-spec? s)
-       (= :vector (shape s))))
-
 (defn- append
   [s fields]
   (conj s fields))
@@ -82,20 +62,15 @@
 (defn add-fields
   [s fields]
   (cond
-    (map-shape? s)
+    (= :map (nth s 0))
     (map-add-fields s fields)
 
-    (vector-shape? s)
-    (vector-add-fields s fields)
-
     :else
-    (throw (IllegalArgumentException. "Unknown shape passed to add-fields"))))
+    (throw (IllegalArgumentException. "Unsupported spec for add-fields"))))
 
 (defprotocol Spec
   (read [_ b] "Relative read and increment the index")
   (write [_ b v] "Relative write and increment the index"))
-
-;TODO non-yielding fields that increment the index but aren't returned on read.
 
 (def bool
   (reify
@@ -169,21 +144,6 @@
     (write [_ b v]
       (bytegeist.protobuf.Util/writeUnsignedVarint32 ^ByteBuf b (unchecked-int v)))))
 
-(def registry
-  {:bool bool
-   :boolean bool
-   :byte byte
-   :int16 int16
-   :int24 int24
-   :int32 int32
-   :int int32
-   :int64 int64
-   :long int64
-   :ubyte ubyte
-   :uint32 uint32
-   :uvarint32 uvarint32
-   })
-
 (declare spec)
 
 (defn- compile-field
@@ -219,6 +179,69 @@
               (write item-spec b item)
               (recur (inc i)))))))))
 
+(defn fixed-length-string-spec
+  [length]
+  (reify
+    Spec
+    (read [_ b]
+      (.readCharSequence ^ByteBuf b length StandardCharsets/UTF_8))
+    (write [_ b v]
+      (.writeBytes ^ByteBuf b (.getBytes ^String v StandardCharsets/UTF_8)))))
+
+(defn length-delimited-string-spec
+  [delimiter-spec offset]
+  (let [offset (or offset 0)]
+    (reify
+      Spec
+      (read [_ b]
+        (let [len (- (read delimiter-spec b) offset)]
+          (if (< len 0)
+            nil
+            (.readCharSequence ^ByteBuf b len StandardCharsets/UTF_8))))
+      (write [_ b v]
+        (if (nil? v)
+          (write delimiter-spec ^ByteBuf b (dec offset))
+          (let [byts (.getBytes ^String v StandardCharsets/UTF_8)]
+            (write delimiter-spec ^ByteBuf b (+ (alength byts) offset))
+            (.writeBytes ^ByteBuf b byts)))))))
+
+(defn string-spec
+  [[_ length offset]]
+  (cond
+    (int? length)
+    (fixed-length-string-spec length)
+
+    :else
+    (length-delimited-string-spec (spec length) offset)))
+
+;; Registry
+
+(def registry
+  {:bool bool
+   :boolean bool
+   :byte byte
+   :int16 int16
+   :short int16
+   :int24 int24
+   :int32 int32
+   :int int32
+   :int64 int64
+   :long int64
+   :ubyte ubyte
+   :uint32 uint32
+   :uvarint32 uvarint32})
+
+(def f-registry
+  {:map map-spec
+   :vector vector-spec
+   :string string-spec})
+
+(defn compile-spec-vector
+  [s]
+  (let [shape (nth s 0)
+        f (clojure.core/get f-registry shape)]
+    (f s)))
+
 (defn spec [s]
   (cond
     (satisfies? Spec s)
@@ -227,8 +250,5 @@
     (keyword? s)
     (clojure.core/get registry s)
 
-    (map-shape? s)
-    (map-spec s)
-
-    (vector-shape? s)
-    (vector-spec s)))
+    (vector? s)
+    (compile-spec-vector s)))

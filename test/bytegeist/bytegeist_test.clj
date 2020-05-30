@@ -1,7 +1,8 @@
 (ns bytegeist.bytegeist-test
   (:require [clojure.test :refer [deftest testing is are]]
             [bytegeist.bytegeist :as g])
-  (:import (io.netty.buffer Unpooled)))
+  (:import (io.netty.buffer Unpooled)
+           (java.util Arrays)))
 
 (def max-ubyte (-> Byte/MAX_VALUE inc (* 2) dec))
 (def max-int24 8388607)
@@ -115,6 +116,33 @@
       :uvarint32 nil
       :uvarint32 ""
       :uvarint32 "uvarint-delimited")))
+
+(deftest bytes-test
+  (testing "No offset"
+    (are [length v] (let [s (g/spec [:bytes length])
+                          b (Unpooled/buffer)]
+                      (g/write s b v)
+                      (Arrays/equals (bytes v) (bytes (g/read s b))))
+      0 (byte-array 0)
+      3 (byte-array 3 (byte 1))
+      ;3 (byte-array 4 1) ;TODO implement a more flexible read and write with start index and length.
+      :short nil
+      :short (byte-array 0)
+      :short (byte-array 3 (byte 1))
+      :uvarint32 (byte-array 0)
+      :uvarint32 (byte-array (max-uvarint 4) (byte 1))))
+
+  (testing "Offset 1"
+    (are [delimeter v] (let [s (g/spec [:bytes delimeter 1])
+                             b (Unpooled/buffer)]
+                         (g/write s b v)
+                         (Arrays/equals (bytes v) (bytes (g/read s b))))
+      :short nil
+      :short (byte-array 0)
+      :short (byte-array 3 (byte 1))
+      :uvarint32 nil
+      :uvarint32 (byte-array 0)
+      :uvarint32 (byte-array (max-uvarint 4) (byte 1)))))
 
 (deftest tuple-write-read
   (are [s v] (let [b (Unpooled/buffer)]

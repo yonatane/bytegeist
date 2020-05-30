@@ -1,5 +1,5 @@
 (ns bytegeist.bytegeist
-  (:refer-clojure :exclude [byte get read set])
+  (:refer-clojure :exclude [byte get read read-string set])
   (:import (io.netty.buffer ByteBuf)
            (java.nio ByteBuffer)
            (java.nio.charset StandardCharsets)))
@@ -210,41 +210,88 @@
     :else
     (length-delimited-vector-spec (spec length) (spec item-spec) offset)))
 
+(defn- read-bytes
+  [^ByteBuf b length]
+  (let [byts (byte-array length)]
+    (.readBytes ^ByteBuf b byts)
+    byts))
 
-(defn fixed-length-string-spec
-  [length]
+(defn- write-bytes
+  [^ByteBuf b byts]
+  (.writeBytes ^ByteBuf b (bytes byts)))
+
+(defn- read-string
+  [^ByteBuf b length]
+  (.readCharSequence ^ByteBuf b length StandardCharsets/UTF_8))
+
+(defn- write-string
+  [^ByteBuf b str]
+  (.writeBytes ^ByteBuf b (.getBytes ^String str StandardCharsets/UTF_8)))
+
+(defn- fixed-length-spec
+  [length read write]
   (reify
     Spec
     (read [_ b]
-      (.readCharSequence ^ByteBuf b length StandardCharsets/UTF_8))
+      (read b length))
     (write [_ b v]
-      (.writeBytes ^ByteBuf b (.getBytes ^String v StandardCharsets/UTF_8)))))
+      (write b v))))
 
-(defn length-delimited-string-spec
+(defn- fixed-length-bytes-spec
+  [length]
+  (fixed-length-spec length read-bytes write-bytes))
+
+(defn- fixed-length-string-spec
+  [length]
+  (fixed-length-spec length read-string write-string))
+
+(defn- length-delimited-bytes-spec
   [delimiter-spec offset]
   (let [offset (or offset 0)]
     (reify
       Spec
       (read [_ b]
-        (let [len (- (read delimiter-spec b) offset)]
-          (if (< len 0)
+        (let [length (- (read delimiter-spec b) offset)]
+          (if (< length 0)
             nil
-            (.readCharSequence ^ByteBuf b len StandardCharsets/UTF_8))))
+            (read-bytes b length))))
+      (write [_ b byts]
+        (if (nil? byts)
+          (write delimiter-spec ^ByteBuf b (dec offset))
+          (do (write delimiter-spec ^ByteBuf b (+ (alength (bytes byts)) offset))
+              (write-bytes b byts)))))))
+
+(defn- length-delimited-string-spec
+  [delimiter-spec offset]
+  (let [offset (or offset 0)]
+    (reify
+      Spec
+      (read [_ b]
+        (let [length (- (read delimiter-spec b) offset)]
+          (if (< length 0)
+            nil
+            (read-string b length))))
       (write [_ b v]
         (if (nil? v)
           (write delimiter-spec ^ByteBuf b (dec offset))
           (let [byts (.getBytes ^String v StandardCharsets/UTF_8)]
             (write delimiter-spec ^ByteBuf b (+ (alength byts) offset))
-            (.writeBytes ^ByteBuf b byts)))))))
+            (write-bytes b byts)))))))
 
-(defn string-spec
-  [[_ length offset]]
-  (cond
-    (int? length)
-    (fixed-length-string-spec length)
+(defn- length-spec-compiler
+  [fixed-length-spec-fn length-delimited-spec-fn]
+  (fn length-delimited-spec
+    [[_ length offset]]
+    (cond
+      (int? length)
+      (fixed-length-spec-fn length)
 
-    :else
-    (length-delimited-string-spec (spec length) offset)))
+      :else
+      (length-delimited-spec-fn (spec length) offset))))
+
+(def string-spec (length-spec-compiler fixed-length-string-spec length-delimited-string-spec))
+
+(def bytes-spec (length-spec-compiler fixed-length-bytes-spec length-delimited-bytes-spec))
 
 ;; Registry
 
@@ -267,7 +314,8 @@
   {:map map-spec
    :vector vector-spec
    :tuple tuple-spec
-   :string string-spec})
+   :string string-spec
+   :bytes bytes-spec})
 
 (defn compile-spec-vector
   [s]

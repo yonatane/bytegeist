@@ -150,7 +150,14 @@
     []
 
     [:vector :uvarint32 :uvarint32 1]
-    [0 (max-uvarint 1) (max-uvarint 2) (max-uvarint 3) (max-uvarint 4)]))
+    [0 (max-uvarint 1) (max-uvarint 2) (max-uvarint 3) (max-uvarint 4)]
+
+    [:vector :uvarint32 [:map
+                         [:a :int32]
+                         [:b [:string :uvarint32 1]]
+                         [:c [:vector :uvarint32 [:tuple :bool :short] 1]]]
+     1]
+    [{:a 1 :b "test-string" :c [[true 1] [false 2] [true 3]]}]))
 
 
 

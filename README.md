@@ -4,6 +4,10 @@ Binary protocol specs for clojure
 
 WIP
 
+```clojure
+[bytegeist "0.1.0-SNAPSHOT"]
+```
+
 ### Current goals
 1. [Malli](https://github.com/metosin/malli)-like flexible data-driven specs for byte codecs
 2. Support multiple protocol versions easily by basing one version on another

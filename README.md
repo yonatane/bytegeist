@@ -18,7 +18,7 @@ WIP
 
 [The tests](test/bytegeist/bytegeist_test.clj) contain the most updated examples.
 
-[Skaza (Kafka proxy)](https://github.com/yonatane/skazka/blob/851873f7a75b9c37f3313d041c4caeddfafa9db0/src/skazka/protocol.clj#L1)
+[Skazka (Kafka proxy)](https://github.com/yonatane/skazka/blob/851873f7a75b9c37f3313d041c4caeddfafa9db0/src/skazka/protocol.clj#L1)
 implements some of the kafka protocol.
 
 Reading Metadata V9 kafka response:

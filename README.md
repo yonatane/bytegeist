@@ -10,7 +10,7 @@ WIP
 
 ### Current goals
 
-1. [Malli](https://github.com/metosin/malli)-like flexible data-driven specs for byte codecs
+1. Flexible data-driven specs for byte codecs
 2. Support multiple protocol versions easily by basing one version on another
 3. Protobuf compatibility without generating code, emphasizing rapid prototyping over performance.
 
@@ -72,9 +72,15 @@ Reading Metadata V9 kafka response:
            [:tagged-fields tagged-fields]]))
 ```
 
-### Previous work
+### Acknowledgements
 
-[Octet](https://github.com/funcool/octet) is a great tool and bytegeist basic internals draw from it.<br>
+[Funcool/octet](https://github.com/funcool/octet) was used before bytegeist and the internals draw from it.
+
+[Metosin/malli](https://github.com/metosin/malli) defines the schema notation bytegeist adopted.
+
+![YourKit](https://www.yourkit.com/images/yklogo.png)<br>
+YourKit supports open source projects with innovative and intelligent tools for monitoring and profiling Java applications.
+YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>.
 
 ## License
 

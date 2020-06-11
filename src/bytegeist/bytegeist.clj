@@ -1,7 +1,6 @@
 (ns bytegeist.bytegeist
   (:refer-clojure :exclude [byte get read read-string set])
   (:import (io.netty.buffer ByteBuf)
-           (java.nio ByteBuffer)
            (java.nio.charset StandardCharsets)))
 
 (defn- append
@@ -20,9 +19,17 @@
   [field]
   (cond-> field (override? field) remove-override-tag))
 
+(defn- map-props
+  [s]
+  (let [props (nth s 1)]
+    (when (map? props)
+      props)))
+
 (defn- map-fields
   [s]
-  (rest s))
+  (if (map-props s)
+    (nthrest s 2)
+    (rest s)))
 
 (defn- field-name
   [field]
@@ -51,9 +58,13 @@
                 r
                 (conj r [fname (clojure.core/get final-types fname)]))))
           []
-          all-ordered)]
+          all-ordered)
 
-    (into [:map] final-fields)))
+        root (if-let [props (map-props s)]
+               [:map props]
+               [:map])]
+
+    (into root final-fields)))
 
 (defn add-fields
   [s fields]
@@ -142,24 +153,44 @@
 
 (declare spec)
 
+(defn length-based-frame-spec [length-spec data-spec]
+  (reify
+    Spec
+    (read [_ b]
+      (some-> length-spec (read b))
+      (read data-spec b))
+    (write [_ b v]
+      (let [frame-index (.writerIndex ^ByteBuf b)]
+        (write length-spec b 0)
+        (write data-spec b v)
+        (let [length (- (.writerIndex ^ByteBuf b) frame-index)]
+          (.writerIndex ^ByteBuf b frame-index)
+          (write length-spec b length)
+          (.writerIndex ^ByteBuf b (+ frame-index length)))))))
+
 (defn- compile-field
   [[field-name field-spec]]
   [field-name (spec field-spec)])
 
 (defn map-spec
   [s]
-  (let [compiled-fields (mapv compile-field (map-fields s))]
-    (reify
-      Spec
-      (read [_ b]
-        (into {}
-              (map (fn [[field-name field-spec]]
-                     [field-name (read field-spec b)]))
-              compiled-fields))
-      (write [_ b v]
-        (run! (fn [[field-name field-spec]]
-                (write field-spec b (clojure.core/get v field-name)))
-              compiled-fields)))))
+  (let [props (map-props s)
+        length-spec (some-> props :length-based-frame spec)
+        compiled-fields (mapv compile-field (map-fields s))
+        data-spec (reify
+                    Spec
+                    (read [_ b]
+                      (into {}
+                            (map (fn [[field-name field-spec]]
+                                   [field-name (read field-spec b)]))
+                            compiled-fields))
+                    (write [_ b v]
+                      (run! (fn [[field-name field-spec]]
+                              (write field-spec b (clojure.core/get v field-name)))
+                            compiled-fields)))]
+    (if length-spec
+      (length-based-frame-spec length-spec data-spec)
+      data-spec)))
 
 (defn tuple-spec
   [s]

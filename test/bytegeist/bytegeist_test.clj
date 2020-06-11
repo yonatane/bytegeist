@@ -211,4 +211,15 @@
     {:a 1
      :b 2
      :m {:b (max-uvarint 3)
+         :c max-int24}}
+
+    (g/spec [:map {:length-based-frame :int32}
+             [:a :int32]
+             [:b :uint32]
+             [:m [:map
+                  [:b :uint32]
+                  [:c :int24]]]])
+    {:a 1
+     :b 2
+     :m {:b (max-uvarint 3)
          :c max-int24}}))

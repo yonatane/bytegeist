@@ -160,13 +160,14 @@
       (some-> length-spec (read b))
       (read data-spec b))
     (write [_ b v]
-      (let [frame-index (.writerIndex ^ByteBuf b)]
-        (write length-spec b 0)
+      (let [frame-index (.writerIndex ^ByteBuf b)
+            _ (write length-spec b 0)
+            length-length (- (.writerIndex ^ByteBuf b) frame-index)]
         (write data-spec b v)
-        (let [length (- (.writerIndex ^ByteBuf b) frame-index)]
+        (let [data-length (- (.writerIndex ^ByteBuf b) frame-index length-length)]
           (.writerIndex ^ByteBuf b frame-index)
-          (write length-spec b length)
-          (.writerIndex ^ByteBuf b (+ frame-index length)))))))
+          (write length-spec b data-length)
+          (.writerIndex ^ByteBuf b (+ frame-index length-length data-length)))))))
 
 (defn- compile-field
   [[field-name field-spec]]

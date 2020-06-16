@@ -1,5 +1,5 @@
 (ns bytegeist.bytegeist
-  (:refer-clojure :exclude [byte get read read-string set])
+  (:refer-clojure :exclude [byte read read-string set])
   (:import (io.netty.buffer ByteBuf)
            (java.nio.charset StandardCharsets)))
 
@@ -56,7 +56,7 @@
             (let [fname (field-name field)]
               (if (contains-field? r field)
                 r
-                (conj r [fname (clojure.core/get final-types fname)]))))
+                (conj r [fname (get final-types fname)]))))
           []
           all-ordered)
 
@@ -78,6 +78,10 @@
 (defprotocol Spec
   (read [_ b] "Relative read and increment the index")
   (write [_ b v] "Relative write and increment the index"))
+
+(defprotocol MapSpec
+  (-properties [_])
+  (-fields [_]))
 
 (def bool
   (reify
@@ -177,8 +181,12 @@
   [s]
   (let [props (map-props s)
         length-spec (some-> props :length spec)
-        compiled-fields (mapv compile-field (map-fields s))
+        fields-data (map-fields s)
+        compiled-fields (mapv compile-field fields-data)
         data-spec (reify
+                    MapSpec
+                    (-properties [_] props)
+                    (-fields [_] compiled-fields)
                     Spec
                     (read [_ b]
                       (into {}
@@ -187,7 +195,7 @@
                             compiled-fields))
                     (write [_ b v]
                       (run! (fn [[field-name field-spec]]
-                              (write field-spec b (clojure.core/get v field-name)))
+                              (write field-spec b (get v field-name)))
                             compiled-fields)))]
     (if length-spec
       (length-based-frame-spec length-spec data-spec)
@@ -325,6 +333,34 @@
 
 (def bytes-spec (length-spec-compiler fixed-length-bytes-spec length-delimited-bytes-spec))
 
+(defn- positions
+  [pred coll]
+  (keep-indexed (fn [idx x]
+                  (when (pred x)
+                    idx))
+                coll))
+
+(defn- multi-spec
+  [[_ {:keys [dispatch]} & children]]
+  (let [cases (into {} (map (fn [[k v]] [k (spec v)]) children))
+        first-spec (-> cases vals first)
+        first-spec-fields (-fields first-spec)
+        first-spec-props (or (-properties first-spec) {})
+        dispatch-pos (first (positions #{dispatch} (map first first-spec-fields)))
+        fields-upto-dispatch (subvec first-spec-fields 0 (inc dispatch-pos))
+        initial-reader (spec (into [:map first-spec-props] fields-upto-dispatch))]
+    (reify
+      Spec
+      (read [_ b]
+        (let [mark (.readerIndex ^ByteBuf b)
+              initial (read initial-reader b)
+              _ (.readerIndex ^ByteBuf b mark)
+              dispatch-val (dispatch initial)
+              case-spec (get cases dispatch-val)]
+          (read case-spec b)))
+      (write [_ b v]
+        (-> v (get dispatch) cases (write b v))))))
+
 ;; Registry
 
 (def registry
@@ -347,12 +383,13 @@
    :vector vector-spec
    :tuple tuple-spec
    :string string-spec
-   :bytes bytes-spec})
+   :bytes bytes-spec
+   :multi multi-spec})
 
 (defn compile-spec-vector
   [s]
   (let [shape (nth s 0)
-        f (or (clojure.core/get f-registry shape) (throw (ex-info "Unknown spec" {:input s})))]
+        f (or (get f-registry shape) (throw (ex-info "Unknown spec" {:input s})))]
     (f s)))
 
 (defn spec [s]
@@ -361,7 +398,7 @@
     s
 
     (keyword? s)
-    (or (clojure.core/get registry s) (throw (ex-info "Unknown spec" {:input s})))
+    (or (get registry s) (throw (ex-info "Unknown spec" {:input s})))
 
     (vector? s)
     (compile-spec-vector s)

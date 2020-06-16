@@ -230,3 +230,22 @@
      :b 2
      :m {:b (max-uvarint 3)
          :c max-int24}}))
+
+(deftest multi-spec
+  (let [role [:multi {:dispatch :type}
+              ["student"
+               [:map
+                [:type [:string {:length :short}]]
+                [:grade :short]]]
+              ["employee"
+               [:map
+                [:type [:string {:length :short}]]
+                [:salary :int]]]]]
+    (are [s v] (let [s (g/spec s)
+                     b (Unpooled/buffer)]
+                 (g/write s b v)
+                 (= v (g/read s b)))
+      role {:type "student"
+            :grade 100}
+      role {:type "employee"
+            :salary 99999})))

@@ -72,6 +72,30 @@ Reading Metadata V9 kafka response:
            [:tagged-fields tagged-fields]]))
 ```
 
+### Multi spec
+You can select a spec at runtime according to any field,
+as long as all fields up to, and including that field, are the same.
+
+```clojure
+(def person
+  (g/spec
+    [:multi {:dispatch :type}
+     ["student"
+      [:map
+       [:type [:string {:length :short}]]
+       [:grade :short]]]
+     ["employee"
+      [:map
+       [:type [:string {:length :short}]]
+       [:salary :int]]]]))
+
+(g/write person buffer {:type "employee"
+                        :salary 99999})
+
+(g/write person buffer {:type "student"
+                        :grade 100})
+```
+
 ### Acknowledgements
 
 [Funcool/octet](https://github.com/funcool/octet) was used before bytegeist and the internals draw from it.

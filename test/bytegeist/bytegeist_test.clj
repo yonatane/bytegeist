@@ -27,6 +27,9 @@
 (deftest fail-unsupported-input
   (is (thrown-with-msg? Exception #"Unsupported" (g/spec 123))))
 
+(deftest fail-unknown-spec
+  (is (thrown-with-msg? Exception #"Unknown" (g/spec :not-here))))
+
 (deftest spec
   (testing "Spec new version from previous"
     (let [v0 [:map [:a :int32]]

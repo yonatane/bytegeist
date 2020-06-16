@@ -352,7 +352,7 @@
 (defn compile-spec-vector
   [s]
   (let [shape (nth s 0)
-        f (clojure.core/get f-registry shape)]
+        f (or (clojure.core/get f-registry shape) (throw (ex-info "Unknown spec" {:input s})))]
     (f s)))
 
 (defn spec [s]
@@ -361,7 +361,7 @@
     s
 
     (keyword? s)
-    (clojure.core/get registry s)
+    (or (clojure.core/get registry s) (throw (ex-info "Unknown spec" {:input s})))
 
     (vector? s)
     (compile-spec-vector s)

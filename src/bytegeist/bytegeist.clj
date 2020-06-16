@@ -364,4 +364,7 @@
     (clojure.core/get registry s)
 
     (vector? s)
-    (compile-spec-vector s)))
+    (compile-spec-vector s)
+
+    :else
+    (throw (ex-info "Unsupported spec input type" {:input s}))))

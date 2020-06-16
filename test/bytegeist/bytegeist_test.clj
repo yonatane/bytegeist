@@ -24,6 +24,9 @@
   (-> request-header-v0
       (g/add-fields [[:client-id [:string {:length :short}]]])))
 
+(deftest fail-unsupported-input
+  (is (thrown-with-msg? Exception #"Unsupported" (g/spec 123))))
+
 (deftest spec
   (testing "Spec new version from previous"
     (let [v0 [:map [:a :int32]]

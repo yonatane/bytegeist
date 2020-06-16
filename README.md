@@ -94,6 +94,11 @@ as long as all fields up to, and including that field, are the same.
 
 (g/write person buffer {:type "student"
                         :grade 100})
+
+(g/read person buffer)
+; => {:type "employee", :salary 99999}
+(g/read person buffer)
+; => {:type "student", :grade 100}
 ```
 
 ### Acknowledgements

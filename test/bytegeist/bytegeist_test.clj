@@ -22,7 +22,7 @@
 
 (def request-header-v1
   (-> request-header-v0
-      (g/add-fields [[:client-id [:string :short]]])))
+      (g/add-fields [[:client-id [:string {:length :short}]]])))
 
 (deftest spec
   (testing "Spec new version from previous"
@@ -91,7 +91,7 @@
 
 (deftest string-test
   (testing "No offset"
-    (are [length v] (let [s (g/spec [:string length])
+    (are [length v] (let [s (g/spec [:string {:length length}])
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (= v (g/read s b)))
@@ -104,11 +104,12 @@
       :uvarint32 ""
       :uvarint32 "uvarint-delimited"))
 
-  (testing "Offset 1"
-    (are [delimeter v] (let [s (g/spec [:string delimeter 1])
-                             b (Unpooled/buffer)]
-                         (g/write s b v)
-                         (= v (g/read s b)))
+  (testing "Adjustment 1"
+    (are [length v] (let [s (g/spec [:string {:length length
+                                              :adjust 1}])
+                          b (Unpooled/buffer)]
+                      (g/write s b v)
+                      (= v (g/read s b)))
       :short nil
       :short ""
       :short "short-delimited"
@@ -119,7 +120,7 @@
 
 (deftest bytes-test
   (testing "No offset"
-    (are [length v] (let [s (g/spec [:bytes length])
+    (are [length v] (let [s (g/spec [:bytes {:length length}])
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (Arrays/equals (bytes v) (bytes (g/read s b))))
@@ -132,11 +133,12 @@
       :uvarint32 (byte-array 0)
       :uvarint32 (byte-array (max-uvarint 4) (byte 1))))
 
-  (testing "Offset 1"
-    (are [delimeter v] (let [s (g/spec [:bytes delimeter 1])
-                             b (Unpooled/buffer)]
-                         (g/write s b v)
-                         (Arrays/equals (bytes v) (bytes (g/read s b))))
+  (testing "Adjustment 1"
+    (are [length v] (let [s (g/spec [:bytes {:length length
+                                             :adjust 1}])
+                          b (Unpooled/buffer)]
+                      (g/write s b v)
+                      (Arrays/equals (bytes v) (bytes (g/read s b))))
       :short nil
       :short (byte-array 0)
       :short (byte-array 3 (byte 1))
@@ -159,35 +161,34 @@
                            b (Unpooled/buffer)]
                        (g/write s b v)
                        (= v (g/read s b)))
-    [:vector 3 :bool]
+    [:vector {:length 3} :bool]
     [true false true]
 
-    [:vector :short :bool]
+    [:vector {:length :short} :bool]
     nil
 
-    [:vector :short :bool]
+    [:vector {:length :short} :bool]
     []
 
-    [:vector :short :bool]
+    [:vector {:length :short} :bool]
     [true false true]
 
-    [:vector :uvarint32 :uvarint32 1]
+    [:vector {:length :uvarint32, :adjust 1} :uvarint32]
     nil
 
-    [:vector :uvarint32 :uvarint32 1]
+    [:vector {:length :uvarint32, :adjust 1} :uvarint32]
     []
 
-    [:vector :uvarint32 :uvarint32 1]
+    [:vector {:length :uvarint32, :adjust 1} :uvarint32]
     [0 (max-uvarint 1) (max-uvarint 2) (max-uvarint 3) (max-uvarint 4)]
 
-    [:vector :uvarint32 [:map
-                         [:a :int32]
-                         [:b [:string :uvarint32 1]]
-                         [:c [:vector :uvarint32 [:tuple :bool :short] 1]]]
-     1]
+    [:vector {:length :uvarint32
+              :adjust 1}
+     [:map
+      [:a :int32]
+      [:b [:string {:length :uvarint32, :adjust 1}]]
+      [:c [:vector {:length :uvarint32, :adjust 1} [:tuple :bool :short]]]]]
     [{:a 1 :b "test-string" :c [[true 1] [false 2] [true 3]]}]))
-
-
 
 (deftest map-write-read
   (are [s v] (let [b (Unpooled/buffer)]
@@ -213,7 +214,7 @@
      :m {:b (max-uvarint 3)
          :c max-int24}}
 
-    (g/spec [:map {:length-based-frame :int32}
+    (g/spec [:map {:length :int32}
              [:a :int32]
              [:b :uint32]
              [:m [:map

@@ -176,7 +176,7 @@
 (defn map-spec
   [s]
   (let [props (map-props s)
-        length-spec (some-> props :length-based-frame spec)
+        length-spec (some-> props :length spec)
         compiled-fields (mapv compile-field (map-fields s))
         data-spec (reify
                     Spec
@@ -218,29 +218,29 @@
         (run! #(write item-spec b %) v)))))
 
 (defn length-delimited-vector-spec
-  [delimiter-spec item-spec offset]
-  (let [offset (or offset 0)]
+  [delimiter-spec item-spec adjust]
+  (let [adjust (or adjust 0)]
     (reify
       Spec
       (read [_ b]
-        (let [len (- (read delimiter-spec b) offset)]
+        (let [len (- (read delimiter-spec b) adjust)]
           (if (< len 0)
             nil
             (vec (repeatedly len #(read item-spec ^ByteBuf b))))))
       (write [_ b v]
         (if (nil? v)
-          (write delimiter-spec b (dec offset))
-          (do (write delimiter-spec b (+ (count v) offset))
+          (write delimiter-spec b (dec adjust))
+          (do (write delimiter-spec b (+ (count v) adjust))
               (run! #(write item-spec b %) v)))))))
 
 (defn vector-spec
-  [[_ length item-spec offset]]
+  [[_ {:keys [length adjust]} item-spec]]
   (cond
     (int? length)
     (fixed-length-vector-spec length item-spec)
 
     :else
-    (length-delimited-vector-spec (spec length) (spec item-spec) offset)))
+    (length-delimited-vector-spec (spec length) (spec item-spec) adjust)))
 
 (defn- read-bytes
   [^ByteBuf b length]
@@ -278,48 +278,48 @@
   (fixed-length-spec length read-string write-string))
 
 (defn- length-delimited-bytes-spec
-  [delimiter-spec offset]
-  (let [offset (or offset 0)]
+  [delimiter-spec adjust]
+  (let [adjust (or adjust 0)]
     (reify
       Spec
       (read [_ b]
-        (let [length (- (read delimiter-spec b) offset)]
+        (let [length (- (read delimiter-spec b) adjust)]
           (if (< length 0)
             nil
             (read-bytes b length))))
       (write [_ b byts]
         (if (nil? byts)
-          (write delimiter-spec ^ByteBuf b (dec offset))
-          (do (write delimiter-spec ^ByteBuf b (+ (alength (bytes byts)) offset))
+          (write delimiter-spec ^ByteBuf b (dec adjust))
+          (do (write delimiter-spec ^ByteBuf b (+ (alength (bytes byts)) adjust))
               (write-bytes b byts)))))))
 
 (defn- length-delimited-string-spec
-  [delimiter-spec offset]
-  (let [offset (or offset 0)]
+  [delimiter-spec adjust]
+  (let [adjust (or adjust 0)]
     (reify
       Spec
       (read [_ b]
-        (let [length (- (read delimiter-spec b) offset)]
+        (let [length (- (read delimiter-spec b) adjust)]
           (if (< length 0)
             nil
             (read-string b length))))
       (write [_ b v]
         (if (nil? v)
-          (write delimiter-spec ^ByteBuf b (dec offset))
+          (write delimiter-spec ^ByteBuf b (dec adjust))
           (let [byts (.getBytes ^String v StandardCharsets/UTF_8)]
-            (write delimiter-spec ^ByteBuf b (+ (alength byts) offset))
+            (write delimiter-spec ^ByteBuf b (+ (alength byts) adjust))
             (write-bytes b byts)))))))
 
 (defn- length-spec-compiler
   [fixed-length-spec-fn length-delimited-spec-fn]
   (fn length-delimited-spec
-    [[_ length offset]]
+    [[_ {:keys [length adjust]}]]
     (cond
       (int? length)
       (fixed-length-spec-fn length)
 
       :else
-      (length-delimited-spec-fn (spec length) offset))))
+      (length-delimited-spec-fn (spec length) adjust))))
 
 (def string-spec (length-spec-compiler fixed-length-string-spec length-delimited-string-spec))
 

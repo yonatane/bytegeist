@@ -1,5 +1,5 @@
 (ns bytegeist.bytegeist
-  (:refer-clojure :exclude [byte read read-string set])
+  (:refer-clojure :exclude [byte read read-string])
   (:import (io.netty.buffer ByteBuf)
            (java.nio.charset StandardCharsets)))
 
@@ -342,24 +342,27 @@
 
 (defn- multi-spec
   [[_ {:keys [dispatch]} & children]]
-  (let [cases (into {} (map (fn [[k v]] [k (spec v)]) children))
+  (let [cases (into {} (map (fn [[k v]] [k (spec v)])) children)
         first-spec (-> cases vals first)
         first-spec-fields (-fields first-spec)
         first-spec-props (or (-properties first-spec) {})
-        dispatch-pos (first (positions #{dispatch} (map first first-spec-fields)))
-        fields-upto-dispatch (subvec first-spec-fields 0 (inc dispatch-pos))
-        initial-reader (spec (into [:map first-spec-props] fields-upto-dispatch))]
+        field-pred (if (keyword? dispatch) #{dispatch} (set dispatch))
+        last-dispatch-pos (last (positions field-pred (map first first-spec-fields)))
+        fields-upto-dispatch (subvec first-spec-fields 0 (inc last-dispatch-pos))
+        initial-reader (spec (into [:map first-spec-props] fields-upto-dispatch))
+        dispatch-f (if (keyword? dispatch) dispatch #(mapv % dispatch))]
     (reify
       Spec
       (read [_ b]
         (let [mark (.readerIndex ^ByteBuf b)
               initial (read initial-reader b)
               _ (.readerIndex ^ByteBuf b mark)
-              dispatch-val (dispatch initial)
+              dispatch-val (dispatch-f initial)
               case-spec (get cases dispatch-val)]
           (read case-spec b)))
       (write [_ b v]
-        (-> v (get dispatch) cases (write b v))))))
+        (-> (get cases (dispatch-f v))
+            (write b v))))))
 
 ;; Registry
 

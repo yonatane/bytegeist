@@ -73,6 +73,7 @@ Reading Metadata V9 kafka response:
 ```
 
 ### Multi spec
+
 You can select a spec at runtime according to any field,
 as long as all fields up to, and including that field, are the same.
 
@@ -89,16 +90,47 @@ as long as all fields up to, and including that field, are the same.
        [:type [:string {:length :short}]]
        [:salary :int]]]]))
 
-(g/write person buffer {:type "employee"
+(g/write person buf {:type "employee"
                         :salary 99999})
 
-(g/write person buffer {:type "student"
+(g/write person buf {:type "student"
                         :grade 100})
 
-(g/read person buffer)
+(g/read person buf)
 ; => {:type "employee", :salary 99999}
-(g/read person buffer)
+(g/read person buf)
 ; => {:type "student", :grade 100}
+```
+
+Dispatch on multiple fields:
+
+```clojure
+(def message
+  (g/spec
+    [:multi {:dispatch [:type :version]}
+     [["produce" 1]
+      [:map
+       [:type [:string {:length :short}]]
+       [:version :short]
+       [:data [:string {:length :int}]]]]
+     [["produce" 2]
+      [:map
+       [:type [:string {:length :short}]]
+       [:version :short]
+       [:client-id [:string {:length :uvarint32}]]
+       [:data [:string {:length :uvarint32}]]]]
+     [["fetch" 1]
+      [:map
+       [:type [:string {:length :short}]]
+       [:version :short]
+       [:partitions [:vector {:length :uvarint32} :uvarint32]]]]]))
+
+(g/write message buf {:type "produce", :version 2
+                      :client-id "test client"
+                      :data "test data"})
+
+(g/read message buf)
+; => {:type "produce", :version 2, :client-id "test client", :data "test data"}
 ```
 
 ### Acknowledgements

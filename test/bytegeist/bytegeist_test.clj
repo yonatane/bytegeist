@@ -10,6 +10,11 @@
 (def max-uint (-> Integer/MAX_VALUE inc (* 2) dec))
 (defn max-uvarint [num-bytes] (long (dec (Math/pow 2 (* 7 num-bytes)))))
 
+(defn write-read [s v]
+  (let [b (Unpooled/buffer)]
+    (g/write s b v)
+    (g/read s b)))
+
 (def message
   [:map
    [:size :int32]])
@@ -231,21 +236,58 @@
      :m {:b (max-uvarint 3)
          :c max-int24}}))
 
-(deftest multi-spec
-  (let [role [:multi {:dispatch :type}
-              ["student"
-               [:map
-                [:type [:string {:length :short}]]
-                [:grade :short]]]
-              ["employee"
-               [:map
-                [:type [:string {:length :short}]]
-                [:salary :int]]]]]
+(deftest multi-spec-single-field
+  (let [role
+        [:multi {:dispatch :type}
+         ["student"
+          [:map
+           [:type [:string {:length :short}]]
+           [:grade :short]]]
+         ["employee"
+          [:map
+           [:type [:string {:length :short}]]
+           [:salary :int]]]]]
+
     (are [s v] (let [s (g/spec s)
                      b (Unpooled/buffer)]
                  (g/write s b v)
                  (= v (g/read s b)))
+
       role {:type "student"
             :grade 100}
+
       role {:type "employee"
             :salary 99999})))
+
+(deftest multi-spec-multiple-fields
+  (let [message
+        (g/spec
+          [:multi {:dispatch [:type :version]}
+           [["produce" 1]
+            [:map
+             [:type [:string {:length :short}]]
+             [:version :short]
+             [:data [:string {:length :int}]]]]
+           [["produce" 2]
+            [:map
+             [:type [:string {:length :short}]]
+             [:version :short]
+             [:client-id [:string {:length :uvarint32}]]
+             [:data [:string {:length :uvarint32}]]]]
+           [["fetch" 1]
+            [:map
+             [:type [:string {:length :short}]]
+             [:version :short]
+             [:partitions [:vector {:length :uvarint32} :uvarint32]]]]])
+
+        produce-1 {:type "produce", :version 1
+                   :data "test data"}
+        produce-2 {:type "produce", :version 2
+                   :client-id "test client"
+                   :data "test data"}
+        fetch-1 {:type "fetch", :version 1
+                 :partitions [0 1 2]}]
+
+    (is (= produce-1 (write-read message produce-1)))
+    (is (= produce-2 (write-read message produce-2)))
+    (is (= fetch-1 (write-read message fetch-1)))))

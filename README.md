@@ -91,10 +91,10 @@ as long as all fields up to, and including that field, are the same.
        [:salary :int]]]]))
 
 (g/write person buf {:type "employee"
-                        :salary 99999})
+                     :salary 99999})
 
 (g/write person buf {:type "student"
-                        :grade 100})
+                     :grade 100})
 
 (g/read person buf)
 ; => {:type "employee", :salary 99999}
@@ -102,35 +102,36 @@ as long as all fields up to, and including that field, are the same.
 ; => {:type "student", :grade 100}
 ```
 
-Dispatch on multiple fields:
+Dispatch on multiple fields, with a function of those fields to determine the dispatch value:
 
 ```clojure
 (def message
   (g/spec
-    [:multi {:dispatch [:type :version]}
-     [["produce" 1]
+    [:multi {:dispatch [:type :version]
+             :dispatch-fn (fn [[t v]] [(keyword t) (if (> v 2) :new :old)])}
+     [[:produce :old]
       [:map
        [:type [:string {:length :short}]]
        [:version :short]
        [:data [:string {:length :int}]]]]
-     [["produce" 2]
+     [[:produce :new]
       [:map
        [:type [:string {:length :short}]]
        [:version :short]
-       [:client-id [:string {:length :uvarint32}]]
+       [:client-id [:string {:length :uvarint32}]] ; A new field in versions 3 and up
        [:data [:string {:length :uvarint32}]]]]
-     [["fetch" 1]
+     [[:fetch :old]
       [:map
        [:type [:string {:length :short}]]
        [:version :short]
        [:partitions [:vector {:length :uvarint32} :uvarint32]]]]]))
 
-(g/write message buf {:type "produce", :version 2
+(g/write message buf {:type "produce", :version 3
                       :client-id "test client"
                       :data "test data"})
 
 (g/read message buf)
-; => {:type "produce", :version 2, :client-id "test client", :data "test data"}
+; => {:type "produce", :version 3, :client-id "test client", :data "test data"}
 ```
 
 ### Acknowledgements

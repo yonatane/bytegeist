@@ -262,33 +262,56 @@
 
 (deftest multi-spec-multiple-fields
   (let [message
-        (g/spec
-          [:multi {:dispatch [:type :version]}
-           [["produce" 1]
-            [:map
-             [:type [:string {:length :short}]]
-             [:version :short]
-             [:data [:string {:length :int}]]]]
-           [["produce" 2]
-            [:map
-             [:type [:string {:length :short}]]
-             [:version :short]
-             [:client-id [:string {:length :uvarint32}]]
-             [:data [:string {:length :uvarint32}]]]]
-           [["fetch" 1]
-            [:map
-             [:type [:string {:length :short}]]
-             [:version :short]
-             [:partitions [:vector {:length :uvarint32} :uvarint32]]]]])
+        [:multi {:dispatch [:type :version]}
+         [["produce" 1]
+          [:map
+           [:type [:string {:length :short}]]
+           [:version :short]
+           [:data [:string {:length :int}]]]]
+         [["produce" 2]
+          [:map
+           [:type [:string {:length :short}]]
+           [:version :short]
+           [:client-id [:string {:length :uvarint32}]]
+           [:data [:string {:length :uvarint32}]]]]
+         [["fetch" 1]
+          [:map
+           [:type [:string {:length :short}]]
+           [:version :short]
+           [:partitions [:vector {:length :uvarint32} :uvarint32]]]]]
 
-        produce-1 {:type "produce", :version 1
-                   :data "test data"}
-        produce-2 {:type "produce", :version 2
-                   :client-id "test client"
-                   :data "test data"}
-        fetch-1 {:type "fetch", :version 1
-                 :partitions [0 1 2]}]
+        produce-v1 {:type "produce", :version 1
+                    :data "test data"}
+        produce-v2 {:type "produce", :version 2
+                    :client-id "test client"
+                    :data "test data"}
+        fetch-v1 {:type "fetch", :version 1
+                  :partitions [0 1 2]}]
 
-    (is (preserved? message produce-1))
-    (is (preserved? message produce-2))
-    (is (preserved? message fetch-1))))
+    (is (preserved? message produce-v1))
+    (is (preserved? message produce-v2))
+    (is (preserved? message fetch-v1))))
+
+(deftest multi-spec-fn
+  (let [message
+        [:multi {:dispatch [:type :version]
+                 :dispatch-fn (fn [[t v]] [(keyword t) (if (> v 2) :new :old)])}
+         [[:produce :old]
+          [:map
+           [:type [:string {:length :short}]]
+           [:version :short]
+           [:data [:string {:length :int}]]]]
+         [[:produce :new]
+          [:map
+           [:type [:string {:length :short}]]
+           [:version :short]
+           [:client-id [:string {:length :uvarint32}]]
+           [:data [:string {:length :uvarint32}]]]]
+         [[:fetch :old]
+          [:map
+           [:type [:string {:length :short}]]
+           [:version :short]
+           [:partitions [:vector {:length :uvarint32} :uvarint32]]]]]]
+    (is (preserved? message {:type "produce", :version 3
+                             :client-id "test client"
+                             :data "test data"}))))

@@ -341,7 +341,7 @@
                 coll))
 
 (defn- multi-spec
-  [[_ {:keys [dispatch]} & children]]
+  [[_ {:keys [dispatch dispatch-fn] :or {dispatch-fn identity}} & children]]
   (let [cases (into {} (map (fn [[k v]] [k (spec v)])) children)
         first-spec (-> cases vals first)
         first-spec-fields (-fields first-spec)
@@ -350,7 +350,7 @@
         last-dispatch-pos (last (positions field-pred (map first first-spec-fields)))
         fields-upto-dispatch (subvec first-spec-fields 0 (inc last-dispatch-pos))
         initial-reader (spec (into [:map first-spec-props] fields-upto-dispatch))
-        dispatch-f (if (keyword? dispatch) dispatch #(mapv % dispatch))]
+        dispatch-f (if (keyword? dispatch) (comp dispatch-fn dispatch) #(dispatch-fn (mapv % dispatch)))]
     (reify
       Spec
       (read [_ b]

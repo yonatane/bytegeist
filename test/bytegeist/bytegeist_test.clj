@@ -1,5 +1,5 @@
 (ns bytegeist.bytegeist-test
-  (:require [clojure.test :refer [deftest testing is are]]
+  (:require [clojure.test :refer [deftest testing is are assert-expr do-report]]
             [bytegeist.bytegeist :as g])
   (:import (io.netty.buffer Unpooled)
            (java.util Arrays)))
@@ -11,9 +11,23 @@
 (defn max-uvarint [num-bytes] (long (dec (Math/pow 2 (* 7 num-bytes)))))
 
 (defn write-read [s v]
-  (let [b (Unpooled/buffer)]
+  (let [s (g/spec s)
+        b (Unpooled/buffer)]
     (g/write s b v)
     (g/read s b)))
+
+(defn preserved?
+  "Not for byte arrays"
+  [s v]
+  (= v (write-read s v)))
+
+(defmethod assert-expr 'preserved? [msg form]
+  (let [s (nth form 1)
+        v (nth form 2)]
+    `(let [read-back# (write-read ~s ~v)
+           report-type# (if (= ~v read-back#) :pass :fail)]
+       (do-report {:type report-type#, :message ~msg,
+                   :expected '~form, :actual read-back#}))))
 
 (def message
   [:map
@@ -129,15 +143,14 @@
       :uvarint32 ""
       :uvarint32 "uvarint-delimited")))
 
-(deftest bytes-test
-  (testing "No offset"
+(deftest bytes-spec
+  (testing "No adjustment"
     (are [length v] (let [s (g/spec [:bytes {:length length}])
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (Arrays/equals (bytes v) (bytes (g/read s b))))
       0 (byte-array 0)
       3 (byte-array 3 (byte 1))
-      ;3 (byte-array 4 1) ;TODO implement a more flexible read and write with start index and length.
       :short nil
       :short (byte-array 0)
       :short (byte-array 3 (byte 1))
@@ -157,21 +170,16 @@
       :uvarint32 (byte-array 0)
       :uvarint32 (byte-array (max-uvarint 4) (byte 1)))))
 
-(deftest tuple-write-read
-  (are [s v] (let [b (Unpooled/buffer)]
-               (g/write s b v)
-               (= v (g/read s b)))
-    (g/spec [:tuple :bool])
+(deftest tuple-spec
+  (are [s v] (preserved? s v)
+    [:tuple :bool]
     [true]
 
-    (g/spec [:tuple :uvarint32 :bool :int24 [:map [:a [:tuple :int32 :uint32]]]])
+    [:tuple :uvarint32 :bool :int24 [:map [:a [:tuple :int32 :uint32]]]]
     [(max-uvarint 2) false max-int24 {:a [0 max-uint]}]))
 
-(deftest vector-write-read
-  (are [spec-data v] (let [s (g/spec spec-data)
-                           b (Unpooled/buffer)]
-                       (g/write s b v)
-                       (= v (g/read s b)))
+(deftest vector-spec
+  (are [s v] (preserved? s v)
     [:vector {:length 3} :bool]
     [true false true]
 
@@ -201,36 +209,35 @@
       [:c [:vector {:length :uvarint32, :adjust 1} [:tuple :bool :short]]]]]
     [{:a 1 :b "test-string" :c [[true 1] [false 2] [true 3]]}]))
 
-(deftest map-write-read
-  (are [s v] (let [b (Unpooled/buffer)]
-               (g/write s b v)
-               (= v (g/read s b)))
-    (g/spec [:map [:a :int32]])
+(deftest map-spec
+  (are [s v] (preserved? s v)
+
+    [:map [:a :int32]]
     {:a 1}
 
-    (g/spec [:map
-             [:a :int32]
-             [:m [:map [:b :int16]]]])
+    [:map
+     [:a :int32]
+     [:m [:map [:b :int16]]]]
     {:a 1
      :m {:b 2}}
 
-    (g/spec [:map
-             [:a :int32]
-             [:b :uint32]
-             [:m [:map
-                  [:b :uint32]
-                  [:c :int24]]]])
+    [:map
+     [:a :int32]
+     [:b :uint32]
+     [:m [:map
+          [:b :uint32]
+          [:c :int24]]]]
     {:a 1
      :b 2
      :m {:b (max-uvarint 3)
          :c max-int24}}
 
-    (g/spec [:map {:length :int32}
-             [:a :int32]
-             [:b :uint32]
-             [:m [:map
-                  [:b :uint32]
-                  [:c :int24]]]])
+    [:map {:length :int32}
+     [:a :int32]
+     [:b :uint32]
+     [:m [:map
+          [:b :uint32]
+          [:c :int24]]]]
     {:a 1
      :b 2
      :m {:b (max-uvarint 3)
@@ -238,26 +245,20 @@
 
 (deftest multi-spec-single-field
   (let [role
-        [:multi {:dispatch :type}
-         ["student"
-          [:map
-           [:type [:string {:length :short}]]
-           [:grade :short]]]
-         ["employee"
-          [:map
-           [:type [:string {:length :short}]]
-           [:salary :int]]]]]
-
-    (are [s v] (let [s (g/spec s)
-                     b (Unpooled/buffer)]
-                 (g/write s b v)
-                 (= v (g/read s b)))
-
-      role {:type "student"
-            :grade 100}
-
-      role {:type "employee"
-            :salary 99999})))
+        (g/spec
+          [:multi {:dispatch :type}
+           ["student"
+            [:map
+             [:type [:string {:length :short}]]
+             [:grade :short]]]
+           ["employee"
+            [:map
+             [:type [:string {:length :short}]]
+             [:salary :int]]]])]
+    (is (preserved? role {:type "student"
+                          :grade 100}))
+    (is (preserved? role {:type "employee"
+                          :salary 99999}))))
 
 (deftest multi-spec-multiple-fields
   (let [message
@@ -288,6 +289,6 @@
         fetch-1 {:type "fetch", :version 1
                  :partitions [0 1 2]}]
 
-    (is (= produce-1 (write-read message produce-1)))
-    (is (= produce-2 (write-read message produce-2)))
-    (is (= fetch-1 (write-read message fetch-1)))))
+    (is (preserved? message produce-1))
+    (is (preserved? message produce-2))
+    (is (preserved? message fetch-1))))

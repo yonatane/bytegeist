@@ -2,7 +2,8 @@
   (:require [clojure.test :refer [deftest testing is are assert-expr do-report]]
             [bytegeist.bytegeist :as g])
   (:import (io.netty.buffer Unpooled)
-           (java.util Arrays)))
+           (java.util Arrays)
+           (clojure.lang ExceptionInfo)))
 
 (def max-ubyte (-> Byte/MAX_VALUE inc (* 2) dec))
 (def max-int24 8388607)
@@ -255,10 +256,21 @@
             [:map
              [:type [:string {:length :short}]]
              [:salary :int]]]])]
-    (is (preserved? role {:type "student"
-                          :grade 100}))
-    (is (preserved? role {:type "employee"
-                          :salary 99999}))))
+    (testing "Successful dispatch"
+      (is (preserved? role {:type "student"
+                            :grade 100}))
+      (is (preserved? role {:type "employee"
+                            :salary 99999})))
+    (testing "Unmatched dispatch throws on write"
+      (let [b (Unpooled/buffer)]
+        (is (thrown? ExceptionInfo #"Invalid dispatch"
+                     (g/write role b {:type "lizard"})))))
+    (testing "Unmatched dispatch throws on read"
+      (let [lizard (g/spec [:map [:type [:string {:length :short}]]])
+            b (Unpooled/buffer)]
+        (g/write lizard b {:type "lizard"})
+        (is (thrown? ExceptionInfo #"Invalid dispatch"
+                     (g/read role b)))))))
 
 (deftest multi-spec-multiple-fields
   (let [message

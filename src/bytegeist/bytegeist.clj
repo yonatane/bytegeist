@@ -357,12 +357,18 @@
         (let [mark (.readerIndex ^ByteBuf b)
               initial (read initial-reader b)
               _ (.readerIndex ^ByteBuf b mark)
-              dispatch-val (dispatch-f initial)
-              case-spec (get cases dispatch-val)]
-          (read case-spec b)))
+              dispatch-val (dispatch-f initial)]
+          (if-some [matched (get cases dispatch-val)]
+            (read matched b)
+            (throw (ex-info "Invalid dispatch value" {:dispatch-options (vals cases)
+                                                      :dispatch-value dispatch-val})))))
+
       (write [_ b v]
-        (-> (get cases (dispatch-f v))
-            (write b v))))))
+        (let [dispatch-val (dispatch-f v)]
+          (if-some [matched (get cases dispatch-val)]
+            (write matched b v)
+            (throw (ex-info "Invalid dispatch value" {:dispatch-options (vals cases)
+                                                      :dispatch-value dispatch-val}))))))))
 
 ;; Registry
 

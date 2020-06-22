@@ -79,8 +79,12 @@
       3 g/int24 min-int24
       4 g/int32 Integer/MAX_VALUE
       4 g/int32 Integer/MIN_VALUE
+      4 g/float Float/MAX_VALUE
+      4 g/float Float/MIN_VALUE
       8 g/int64 Long/MAX_VALUE
-      8 g/int64 Long/MIN_VALUE))
+      8 g/int64 Long/MIN_VALUE
+      8 g/double Double/MIN_VALUE
+      8 g/double Double/MAX_VALUE))
 
   (testing "unsigned within range"
     (are [num-bytes s v] (let [b (Unpooled/buffer num-bytes num-bytes)]

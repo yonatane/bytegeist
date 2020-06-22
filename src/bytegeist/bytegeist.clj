@@ -1,5 +1,5 @@
 (ns bytegeist.bytegeist
-  (:refer-clojure :exclude [byte read read-string])
+  (:refer-clojure :exclude [byte double float read read-string])
   (:import (io.netty.buffer ByteBuf)
            (java.nio.charset StandardCharsets)))
 
@@ -130,6 +130,22 @@
       (.readLong ^ByteBuf b))
     (write [_ b v]
       (.writeLong ^ByteBuf b (unchecked-long v)))))
+
+(def double
+  (reify
+    Spec
+    (read [_ b]
+      (.readDouble ^ByteBuf b))
+    (write [_ b v]
+      (.writeDouble ^ByteBuf b (unchecked-double v)))))
+
+(def float
+  (reify
+    Spec
+    (read [_ b]
+      (.readFloat ^ByteBuf b))
+    (write [_ b v]
+      (.writeFloat ^ByteBuf b (unchecked-float v)))))
 
 (def ubyte
   (reify
@@ -383,6 +399,8 @@
    :int int32
    :int64 int64
    :long int64
+   :double double
+   :float float
    :ubyte ubyte
    :uint32 uint32
    :uvarint32 uvarint32})

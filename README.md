@@ -10,9 +10,12 @@ WIP
 
 ### Current goals
 
-1. Flexible data-driven specs for byte codecs
-2. Support multiple protocol versions easily by basing one version on another
-3. Protobuf compatibility without generating code, emphasizing rapid prototyping over performance.
+1. Define the binary encoding of any protocol using plain data
+2. Simply define multiple versions of a protocol without duplication or extra programming
+3. Protobuf without code generation
+4. Support NIO ByteBuffer, Netty ByteBuf and InputStream/OutputStream
+5. Enable extensions for custom types and I/O
+6. Fast
 
 ### Examples
 
@@ -21,55 +24,40 @@ WIP
 [Skazka (Kafka proxy)](https://github.com/yonatane/skazka/blob/851873f7a75b9c37f3313d041c4caeddfafa9db0/src/skazka/protocol.clj#L1)
 implements some of the kafka protocol.
 
-Reading Metadata V9 kafka response:
+Reading and writing simple data:
 
 ```clojure
 (require '[bytegeist.bytegeist :as g])
+(import '(io.netty.buffer ByteBuf Unpooled))
+(def b (Unpooled/buffer))
 
-(def compact-string
-  "String with unsigned varint length delimiter set to N+1 (N is number of bytes).
-  N=0 means empty string \"\". N=-1 means nil"
-  (g/spec [:string {:length :uvarint32, :adjust 1}]))
+;; Just an integer
+(def year (g/spec :int32))
 
-(defn compact-array
-  "Array with unsigned varint length delimiter set to N+1 (N is number of items).
-  N=0 means empty vector `[]`. N=-1 means nil"
-  [s]
-  (g/spec [:vector {:length :uvarint32, :adjust 1} s]))
+(g/write year b 2020)
+(g/read year b)
+=> 2020
 
-(def tagged-fields
-  (reify
-    g/Spec
-    (read [_ b]
-      #_(impl-read))
-    (write [_ b v]
-      #_(impl-write))))
+;; A length-delimited string, first 2 bytes hold the length
+(def username (g/spec [:string {:length :short}]))
 
-(def broker
-  (g/spec [:map
-           [:node-id :int32]
-           [:host compact-string]
-           [:port :int32]
-           [:rack compact-string]
-           [:tagged-fields tagged-fields]]))
+(g/write username b "byteme72")
+(g/read username b)
+=> "byteme72"
 
-(def brokers
-  (compact-array broker))
+;; A map
+(def user (g/spec [:map
+                   [:username [:string {:length :short}]]
+                   [:year :int32]]))
+;; Or reuse previously defined types
+(def user (g/spec [:map
+                   [:username username]
+                   [:year year]]))
 
-(def topic
-  #_(etc))
-
-(def metadata-res-v9
-  (g/spec [:map
-           [:correlation-id :int32]
-           [:header-tagged-fields tagged-fields]
-           [:throttle-time-ms :int32]
-           [:brokers brokers]
-           [:cluster-id compact-string]
-           [:controller-id :int32]
-           [:topics (compact-array topic)]
-           [:cluster-authorized-operations :int32]
-           [:tagged-fields tagged-fields]]))
+(g/write user b {:username "byteme72"
+                 :year 2020})
+(g/read user b)
+=> {:username "byteme72", :year 2020}
 ```
 
 ### Multi spec
@@ -126,7 +114,8 @@ Dispatch on multiple fields, with a function of those fields to determine the di
        [:version :short]
        [:partitions [:vector {:length :uvarint32} :uvarint32]]]]]))
 
-(g/write message buf {:type "produce", :version 3
+(g/write message buf {:type "produce"
+                      :version 3
                       :client-id "test client"
                       :data "test data"})
 
@@ -136,9 +125,9 @@ Dispatch on multiple fields, with a function of those fields to determine the di
 
 ### Acknowledgements
 
-[Funcool/octet](https://github.com/funcool/octet) was used before bytegeist and the internals draw from it.
-
 [Metosin/malli](https://github.com/metosin/malli) defines the schema notation bytegeist adopted.
+
+[Funcool/octet](https://github.com/funcool/octet) was used before bytegeist.
 
 ![YourKit](https://www.yourkit.com/images/yklogo.png)<br>
 YourKit supports open source projects with innovative and intelligent tools for monitoring and profiling Java applications.

@@ -12,8 +12,7 @@
 (defn max-uvarint [num-bytes] (long (dec (Math/pow 2 (* 7 num-bytes)))))
 
 (defn write-read [s v]
-  (let [s (g/spec s)
-        b (Unpooled/buffer)]
+  (let [b (Unpooled/buffer)]
     (g/write s b v)
     (g/read s b)))
 
@@ -121,7 +120,7 @@
 
 (deftest string-test
   (testing "No offset"
-    (are [length v] (let [s (g/spec [:string {:length length}])
+    (are [length v] (let [s [:string {:length length}]
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (= v (g/read s b)))
@@ -135,8 +134,7 @@
       :uvarint32 "uvarint-delimited"))
 
   (testing "Adjustment 1"
-    (are [length v] (let [s (g/spec [:string {:length length
-                                              :adjust 1}])
+    (are [length v] (let [s [:string {:length length :adjust 1}]
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (= v (g/read s b)))
@@ -150,7 +148,7 @@
 
 (deftest bytes-spec
   (testing "No adjustment"
-    (are [length v] (let [s (g/spec [:bytes {:length length}])
+    (are [length v] (let [s [:bytes {:length length}]
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (Arrays/equals (bytes v) (bytes (g/read s b))))
@@ -163,8 +161,7 @@
       :uvarint32 (byte-array (max-uvarint 4) (byte 1))))
 
   (testing "Adjustment 1"
-    (are [length v] (let [s (g/spec [:bytes {:length length
-                                             :adjust 1}])
+    (are [length v] (let [s [:bytes {:length length :adjust 1}]
                           b (Unpooled/buffer)]
                       (g/write s b v)
                       (Arrays/equals (bytes v) (bytes (g/read s b))))
@@ -216,7 +213,6 @@
 
 (deftest map-spec
   (are [s v] (preserved? s v)
-
     [:map [:a :int32]]
     {:a 1}
 
@@ -249,17 +245,15 @@
          :c max-int24}}))
 
 (deftest multi-spec-single-field
-  (let [role
-        (g/spec
-          [:multi {:dispatch :type}
-           ["student"
-            [:map
-             [:type [:string {:length :short}]]
-             [:grade :short]]]
-           ["employee"
-            [:map
-             [:type [:string {:length :short}]]
-             [:salary :int]]]])]
+  (let [role [:multi {:dispatch :type}
+              ["student"
+               [:map
+                [:type [:string {:length :short}]]
+                [:grade :short]]]
+              ["employee"
+               [:map
+                [:type [:string {:length :short}]]
+                [:salary :int]]]]]
     (testing "Successful dispatch"
       (is (preserved? role {:type "student"
                             :grade 100}))
@@ -270,7 +264,7 @@
         (is (thrown? ExceptionInfo #"Invalid dispatch"
                      (g/write role b {:type "lizard"})))))
     (testing "Unmatched dispatch throws on read"
-      (let [lizard (g/spec [:map [:type [:string {:length :short}]]])
+      (let [lizard [:map [:type [:string {:length :short}]]]
             b (Unpooled/buffer)]
         (g/write lizard b {:type "lizard"})
         (is (thrown? ExceptionInfo #"Invalid dispatch"

@@ -3,6 +3,8 @@
   (:import (io.netty.buffer ByteBuf)
            (java.nio.charset StandardCharsets)))
 
+(declare spec read write)
+
 (defn- append
   [s fields]
   (conj s fields))
@@ -76,8 +78,8 @@
     (throw (IllegalArgumentException. "Unsupported spec for add-fields"))))
 
 (defprotocol Spec
-  (read [_ b] "Relative read and increment the index")
-  (write [_ b v] "Relative write and increment the index"))
+  (-read [_ b] "Relative read and increment the index")
+  (-write [_ b v] "Relative write and increment the index"))
 
 (defprotocol MapSpec
   (-properties [_])
@@ -86,89 +88,89 @@
 (def bool
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readBoolean ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeBoolean ^ByteBuf b (boolean v)))))
 
 (def byte
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readByte ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeByte ^ByteBuf b (unchecked-int v)))))
 
 (def int16
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readShort ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeShort ^ByteBuf b (unchecked-int v)))))
 
 (def int24
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readMedium ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeMedium ^ByteBuf b (unchecked-int v)))))
 
 (def int32
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readInt ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeInt ^ByteBuf b (unchecked-int v)))))
 
 (def int64
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readLong ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeLong ^ByteBuf b (unchecked-long v)))))
 
 (def double
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readDouble ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeDouble ^ByteBuf b (unchecked-double v)))))
 
 (def float
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readFloat ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeFloat ^ByteBuf b (unchecked-float v)))))
 
 (def ubyte
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readUnsignedByte ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeByte ^ByteBuf b (unchecked-int v)))))
 
 (def uint32
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (.readUnsignedInt ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (.writeInt ^ByteBuf b (unchecked-int v)))))
 
 (def uvarint32
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (bytegeist.protobuf.Util/readUnsignedVarint32 ^ByteBuf b))
-    (write [_ b v]
+    (-write [_ b v]
       (bytegeist.protobuf.Util/writeUnsignedVarint32 ^ByteBuf b (unchecked-int v)))))
 
 (declare spec)
@@ -176,10 +178,10 @@
 (defn length-based-frame-spec [length-spec data-spec]
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (some-> length-spec (read b))
       (read data-spec b))
-    (write [_ b v]
+    (-write [_ b v]
       (let [frame-index (.writerIndex ^ByteBuf b)
             _ (write length-spec b 0)
             length-length (- (.writerIndex ^ByteBuf b) frame-index)]
@@ -204,12 +206,12 @@
                     (-properties [_] props)
                     (-fields [_] compiled-fields)
                     Spec
-                    (read [_ b]
+                    (-read [_ b]
                       (into {}
                             (map (fn [[field-name field-spec]]
                                    [field-name (read field-spec b)]))
                             compiled-fields))
-                    (write [_ b v]
+                    (-write [_ b v]
                       (run! (fn [[field-name field-spec]]
                               (write field-spec b (get v field-name)))
                             compiled-fields)))]
@@ -222,9 +224,9 @@
   (let [specs (mapv spec (rest s))]
     (reify
       Spec
-      (read [_ b]
+      (-read [_ b]
         (mapv (fn [item-spec] (read item-spec b)) specs))
-      (write [_ b v]
+      (-write [_ b v]
         (loop [i 0]
           (when (< i (count specs))
             (let [item-spec (nth specs i) item (nth v i)]
@@ -236,9 +238,9 @@
   (let [item-spec (spec item-spec)]
     (reify
       Spec
-      (read [_ b]
+      (-read [_ b]
         (vec (repeatedly length #(read item-spec ^ByteBuf b))))
-      (write [_ b v]
+      (-write [_ b v]
         (run! #(write item-spec b %) v)))))
 
 (defn length-delimited-vector-spec
@@ -246,12 +248,12 @@
   (let [adjust (or adjust 0)]
     (reify
       Spec
-      (read [_ b]
+      (-read [_ b]
         (let [len (- (read delimiter-spec b) adjust)]
           (if (< len 0)
             nil
             (vec (repeatedly len #(read item-spec ^ByteBuf b))))))
-      (write [_ b v]
+      (-write [_ b v]
         (if (nil? v)
           (write delimiter-spec b (dec adjust))
           (do (write delimiter-spec b (+ (count v) adjust))
@@ -288,9 +290,9 @@
   [length read write]
   (reify
     Spec
-    (read [_ b]
+    (-read [_ b]
       (read b length))
-    (write [_ b v]
+    (-write [_ b v]
       (write b v))))
 
 (defn- fixed-length-bytes-spec
@@ -306,12 +308,12 @@
   (let [adjust (or adjust 0)]
     (reify
       Spec
-      (read [_ b]
+      (-read [_ b]
         (let [length (- (read delimiter-spec b) adjust)]
           (if (< length 0)
             nil
             (read-bytes b length))))
-      (write [_ b byts]
+      (-write [_ b byts]
         (if (nil? byts)
           (write delimiter-spec ^ByteBuf b (dec adjust))
           (do (write delimiter-spec ^ByteBuf b (+ (alength (bytes byts)) adjust))
@@ -322,12 +324,12 @@
   (let [adjust (or adjust 0)]
     (reify
       Spec
-      (read [_ b]
+      (-read [_ b]
         (let [length (- (read delimiter-spec b) adjust)]
           (if (< length 0)
             nil
             (read-string b length))))
-      (write [_ b v]
+      (-write [_ b v]
         (if (nil? v)
           (write delimiter-spec ^ByteBuf b (dec adjust))
           (let [byts (.getBytes ^String v StandardCharsets/UTF_8)]
@@ -369,7 +371,7 @@
         dispatch-f (if (keyword? dispatch) (comp dispatch-fn dispatch) #(dispatch-fn (mapv % dispatch)))]
     (reify
       Spec
-      (read [_ b]
+      (-read [_ b]
         (let [mark (.readerIndex ^ByteBuf b)
               initial (read initial-reader b)
               _ (.readerIndex ^ByteBuf b mark)
@@ -379,7 +381,7 @@
             (throw (ex-info "Invalid dispatch value" {:dispatch-options (vals cases)
                                                       :dispatch-value dispatch-val})))))
 
-      (write [_ b v]
+      (-write [_ b v]
         (let [dispatch-val (dispatch-f v)]
           (if-some [matched (get cases dispatch-val)]
             (write matched b v)
@@ -432,3 +434,9 @@
 
     :else
     (throw (ex-info "Unsupported spec input type" {:input s}))))
+
+(defn read [s b]
+  (-read (spec s) b))
+
+(defn write [s b v]
+  (-write (spec s) b v))

@@ -323,3 +323,10 @@
     (is (preserved? message {:type "produce", :version 3
                              :client-id "test client"
                              :data "test data"}))))
+
+(deftest map-of-spec
+  (let [tag :uvarint32
+        data [:bytes {:length :uvarint32}]
+        tagged-fields [:map-of {:length :uvarint32} tag data]]
+    (is (preserved? tagged-fields {0 (.getBytes "hello")
+                                   1 (byte-array 10000)}))))

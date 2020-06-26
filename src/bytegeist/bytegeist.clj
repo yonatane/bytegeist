@@ -175,7 +175,7 @@
 
 (declare spec)
 
-(defn length-based-frame-spec [length-spec data-spec]
+(defn- length-based-frame-spec [length-spec data-spec]
   (reify
     Spec
     (-read [_ b]
@@ -218,6 +218,39 @@
     (if length-spec
       (length-based-frame-spec length-spec data-spec)
       data-spec)))
+
+(defn map-of-spec
+  [[_ {:keys [length adjust]} k-spec v-spec]]
+  (let [length-spec (when (not (int? length)) (spec length))
+        adjust (or adjust 0)
+        k-spec (spec k-spec)
+        v-spec (spec v-spec)]
+    (if length-spec
+      (reify
+        Spec
+        (-read [_ b]
+          (let [len (- (read length-spec b) adjust)]
+            (if (< len 0)
+              nil
+              (into {} (repeatedly len #(vector (read k-spec b) (read v-spec b)))))))
+        (-write [_ b m]
+          (if (nil? m)
+            (write length-spec b (dec adjust))
+            (do (write length-spec b (+ (count m) adjust))
+                (run! (fn [[k v]]
+                        (write k-spec b k)
+                        (write v-spec b v))
+                      m)))))
+      (reify
+        Spec
+        (-read [_ b]
+          (let [len length]
+            (into {} (repeatedly len #(vector (read k-spec b) (read v-spec b))))))
+        (-write [_ b m]
+          (run! (fn [[k v]]
+                  (write k-spec b k)
+                  (write v-spec b v))
+                m))))))
 
 (defn tuple-spec
   [s]
@@ -409,6 +442,7 @@
 
 (def f-registry
   {:map map-spec
+   :map-of map-of-spec
    :vector vector-spec
    :tuple tuple-spec
    :string string-spec

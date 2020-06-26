@@ -1,5 +1,6 @@
 (ns bytegeist.bytegeist-test
   (:require [clojure.test :refer [deftest testing is are assert-expr do-report]]
+            [clojure.walk]
             [bytegeist.bytegeist :as g])
   (:import (io.netty.buffer Unpooled)
            (java.util Arrays)
@@ -16,10 +17,12 @@
     (g/write s b v)
     (g/read s b)))
 
+(defn seq-bytes [v]
+  (clojure.walk/postwalk (fn [x] (if (bytes? x) (seq x) x)) v))
+
 (defn preserved?
-  "Not for byte arrays"
   [s v]
-  (= v (write-read s v)))
+  (= (seq-bytes v) (seq-bytes (write-read s v))))
 
 (defmethod assert-expr 'preserved? [msg form]
   (let [s (nth form 1)
@@ -148,10 +151,8 @@
 
 (deftest bytes-spec
   (testing "No adjustment"
-    (are [length v] (let [s [:bytes {:length length}]
-                          b (Unpooled/buffer)]
-                      (g/write s b v)
-                      (Arrays/equals (bytes v) (bytes (g/read s b))))
+    (are [length v] (let [s [:bytes {:length length}]]
+                      (preserved? s v))
       0 (byte-array 0)
       3 (byte-array 3 (byte 1))
       :short nil
@@ -161,10 +162,8 @@
       :uvarint32 (byte-array (max-uvarint 4) (byte 1))))
 
   (testing "Adjustment 1"
-    (are [length v] (let [s [:bytes {:length length :adjust 1}]
-                          b (Unpooled/buffer)]
-                      (g/write s b v)
-                      (Arrays/equals (bytes v) (bytes (g/read s b))))
+    (are [length v] (let [s [:bytes {:length length :adjust 1}]]
+                      (preserved? s v))
       :short nil
       :short (byte-array 0)
       :short (byte-array 3 (byte 1))

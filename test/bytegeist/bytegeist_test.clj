@@ -3,7 +3,6 @@
             [clojure.walk]
             [bytegeist.bytegeist :as g])
   (:import (io.netty.buffer Unpooled)
-           (java.util Arrays)
            (clojure.lang ExceptionInfo)))
 
 (def max-ubyte (-> Byte/MAX_VALUE inc (* 2) dec))
@@ -28,9 +27,9 @@
   (let [s (nth form 1)
         v (nth form 2)]
     `(let [read-back# (write-read ~s ~v)
-           report-type# (if (= ~v read-back#) :pass :fail)]
+           report-type# (if (= (seq-bytes ~v) (seq-bytes read-back#)) :pass :fail)]
        (do-report {:type report-type#, :message ~msg,
-                   :expected '~form, :actual read-back#}))))
+                   :expected '~v, :actual read-back#}))))
 
 (def message
   [:map

@@ -34,16 +34,20 @@ Reading and writing simple data:
 ;; Just an integer
 (g/write :int32 b 2020)
 (g/read :int32 b)
-=> 2020
+;=> 2020
 
 ;; A length-delimited string, first 2 bytes hold the length
 (def username [:string {:length :short}])
 
 (g/write username b "byteme72")
 (g/read username b)
-=> "byteme72"
+;=> "byteme72"
+```
 
-;; A map
+Maps:
+
+```clojure
+;; A map with predefined fields
 (def user [:map
            [:username [:string {:length :short}]]
            [:year :int32]])
@@ -55,7 +59,22 @@ Reading and writing simple data:
 (g/write user b {:username "byteme72"
                  :year 2020})
 (g/read user b)
-=> {:username "byteme72", :year 2020}
+;=> {:username "byteme72", :year 2020}
+```
+
+Map-of:
+
+```clojure
+;; Map-of int to bytes, prefixed by the number of fields
+(def tagged-fields
+  (let [tag :uvarint32
+        data [:bytes {:length :uvarint32}]]
+    [:map-of {:length :uvarint32} tag data]))
+
+(g/write tagged-fields b {0 (.getBytes "hello")
+                          1 (byte-array 10000)})
+(g/read tagged-fields b)
+;=> {0 #object["[B" 0x667e83eb "[B@667e83eb"], 1 #object["[B" 0xed01c80 "[B@ed01c80"]}
 ```
 
 ### Multi spec
@@ -118,6 +137,31 @@ Dispatch on multiple fields, with a function of those fields to determine the di
 (g/read message buf)
 ; => {:type "produce", :version 3, :client-id "test client", :data "test data"}
 ```
+
+### Built-in types
+
+`:bool`
+`:boolean`
+`:byte`
+`:int16`
+`:short`
+`:int24`
+`:int32`
+`:int`
+`:int64`
+`:long`
+`:double`
+`:float`
+`:ubyte`
+`:uint32`
+`:uvarint32`
+`:map`
+`:map-of`
+`:vector`
+`:tuple`
+`:string`
+`:bytes`
+`:multi`
 
 ### Acknowledgements
 

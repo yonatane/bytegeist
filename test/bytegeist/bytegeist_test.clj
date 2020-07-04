@@ -330,3 +330,48 @@
         tagged-fields [:map-of {:length :uvarint32} tag data]]
     (is (preserved? tagged-fields {0 (.getBytes "hello")
                                    1 (byte-array 10000)}))))
+
+(deftest inline
+  (testing "A map inside another"
+    (let [message
+          [:map
+           [:leaf :int32]
+           [:nested [:map [:leaf :int32]]]
+           [:inlined {:inline true} [:map [:inline-leaf :int32]]]]]
+      (is (preserved? message {:leaf 1
+                               :nested {:leaf 2}
+                               :inline-leaf 3}))))
+  (testing "Two multi-specs inlined in a map"
+    (let [message
+          [:map
+           [:header {:inline true}
+            [:multi {:dispatch :header-version}
+             [0 [:map
+                 [:header-version :short]
+                 [:header-val [:string {:length :short}]]]]
+             [1 [:map
+                 [:header-version :short]
+                 [:header-val [:string {:length :uvarint32}]]
+                 [:extra-val [:string {:length :uvarint32}]]]]]]
+           [:data [:string {:length :int32}]]
+           [:footer {:inline true}
+            [:multi {:dispatch :footer-version}
+             [0 [:map
+                 [:footer-version :short]
+                 [:footer-val [:string {:length :short}]]]]
+             [1 [:map
+                 [:footer-version :short]
+                 [:footer-val :uvarint32]]]]]]
+          old-header {:header-version 0
+                      :header-val "old"}
+          new-header {:header-version 1
+                      :header-val "new"
+                      :extra-val "extra"}
+          data {:data "same"}
+          old-footer {:footer-version 0
+                      :footer-val "str"}
+          new-footer {:footer-version 1
+                      :footer-val 123}]
+      (doall (for [header [old-header new-header]
+                   footer [old-footer new-footer]]
+               (is (preserved? message (merge header data footer))))))))

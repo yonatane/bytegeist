@@ -192,8 +192,12 @@
           (.writerIndex ^ByteBuf b (+ frame-index length-length data-length)))))))
 
 (defn- compile-field
-  [[field-name field-spec]]
-  [field-name (spec field-spec)])
+  [field]
+  (if (= 2 (count field))
+    (let [[field-name field-spec] field]
+      [field-name nil (spec field-spec)])
+    (let [[field-name field-props field-spec] field]
+      [field-name field-props (spec field-spec)])))
 
 (defn map-spec
   [s]
@@ -208,12 +212,19 @@
                     Spec
                     (-read [_ b]
                       (into {}
-                            (map (fn [[field-name field-spec]]
-                                   [field-name (read field-spec b)]))
+                            (mapcat (fn [[field-name field-props field-spec]]
+                                      (if (:inline field-props)
+                                        (read field-spec b)
+                                        [[field-name (read field-spec b)]])))
                             compiled-fields))
                     (-write [_ b v]
-                      (run! (fn [[field-name field-spec]]
-                              (write field-spec b (get v field-name)))
+                      (run! (fn [[field-name field-props field-spec :as field]]
+                              (try
+                                (if (:inline field-props)
+                                  (write field-spec b v)
+                                  (write field-spec b (get v field-name)))
+                                (catch Exception e
+                                  (throw (ex-info "Failed write" {:field field :v v} e)))))
                             compiled-fields)))]
     (if length-spec
       (length-based-frame-spec length-spec data-spec)

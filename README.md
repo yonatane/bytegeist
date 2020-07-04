@@ -62,6 +62,27 @@ Maps:
 ;=> {:username "byteme72", :year 2020}
 ```
 
+Inline map inside its parent:
+
+```clojure
+;; A message where the header has multiple versions
+(def message
+  [:map
+   [:header {:inline true}
+    [:multi {:dispatch :version}
+     [0 [:map [:version :short] [:h1 :int32]]]
+     [1 [:map [:version :short] [:h1 :uvarint32] [:h2 :bool]]]]]
+   [:data [:string {:length :int32}]]])
+
+(g/write message b {:version 0 :h1 123 :data "old"})
+(g/write message b {:version 1 :h1 123 :h2 true :data "new"})
+
+(g/read message b)
+=> {:version 0, :h1 123, :data "old"}
+(g/read message b)
+=> {:version 1, :h1 123, :h2 true, :data "new"}
+```
+
 Map-of:
 
 ```clojure

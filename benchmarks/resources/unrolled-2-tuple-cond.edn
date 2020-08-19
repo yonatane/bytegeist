@@ -1,0 +1,26 @@
+{:benchmarks
+ [{:name :rolled-2-tuple
+   :fn bytegeist.bytegeist/-read
+   :args [:state/tuple :state/buf]}]
+
+ :params
+ {:tuple [[:tuple :long :long]
+          [:tuple :long :double]]
+  :v [[1 2]]
+  :buf-size 16}
+
+ :states
+ {:tuple
+  {:fn bytegeist.jmh.misc/unrolled-2-tuple-cond
+   :args [:param/tuple]}
+
+  :buf
+  {:scope :thread
+   :setup {:fn bytegeist.jmh.misc/prepare-buf
+           :args [:param/buf-size :state/tuple :param/v]}
+   :invocation {:teardown {:fn bytegeist.jmh.misc/reset-reader}}}}
+
+ :options
+ {:jmh/default {:fork {:count 1}
+                :measurement {:iterations 1}
+                :mode [:throughput]}}}

@@ -5,7 +5,7 @@
 
 (declare spec read write)
 
-(defn- append
+#_(defn- append
   [s fields]
   (conj s fields))
 

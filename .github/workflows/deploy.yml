@@ -9,6 +9,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Lint
+        uses: DeLaGuardo/clojure-lint-action@v1
+        with:
+          clj-kondo-args: --lint src test
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Test
         run: lein test
       - name: Deploy

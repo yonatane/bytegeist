@@ -1,6 +1,10 @@
 name: Clojars Deploy
 
-on: push
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 jobs:
   deploy:
@@ -17,6 +21,7 @@ jobs:
       - name: Test
         run: lein test
       - name: Deploy
+        if: github.event_name == 'push'
         env:
           CLOJARS_USER: ${{ secrets.CLOJARS_USER }}
           CLOJARS_PASS: ${{ secrets.CLOJARS_PASS }}

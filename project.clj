@@ -2,6 +2,13 @@
   :description "Binary protocol specs for clojure"
   :url "https://github.com/yonatane/bytegeist"
   :license {:name "MIT License"}
+  :deploy-repositories [["releases" {:url "https://repo.clojars.org"
+                                     :sign-releases false
+                                     :username :env/clojars_user
+                                     :password :env/clojars_pass}]
+                        ["snapshots" {:url "https://repo.clojars.org"
+                                      :username :env/clojars_user
+                                      :password :env/clojars_pass}]]
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [io.netty/netty-buffer "4.1.49.Final"]]
   :profiles {:dev {:source-paths ["dev"]

@@ -1,5 +1,7 @@
 # bytegeist
 
+![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/yonatane/bytegeist/Clojars%20Deploy?event=push&label=Build)
+
 Binary protocol specs for clojure
 
 WIP

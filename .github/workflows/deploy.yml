@@ -2,6 +2,8 @@ name: Clojars Deploy
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:

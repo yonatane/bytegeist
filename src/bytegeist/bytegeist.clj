@@ -26,6 +26,7 @@
       props)))
 
 (defn- map-fields
+  "Get the fields of a map spec"
   [s]
   (if (map-props s)
     (nthrest s 2)

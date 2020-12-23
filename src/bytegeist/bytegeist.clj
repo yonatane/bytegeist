@@ -6,6 +6,7 @@
 (declare spec read write)
 
 (defn- override?
+  "Check whether to override a map field if previously defined"
   [field]
   (= :override (first field)))
 

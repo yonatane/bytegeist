@@ -5,10 +5,6 @@
 
 (declare spec read write)
 
-(defn- append
-  [s fields]
-  (conj s fields))
-
 (defn- override?
   [field]
   (= :override (first field)))

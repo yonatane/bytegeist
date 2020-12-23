@@ -14,7 +14,13 @@
   :profiles {:dev {:source-paths ["dev"]
                    :dependencies [[org.clojure/tools.namespace "1.0.0"]
                                   [criterium "0.4.5"]
-                                  [com.clojure-goes-fast/clj-async-profiler "0.4.1"]]}}
+                                  [com.clojure-goes-fast/clj-async-profiler "0.4.1"]]}
+             :jmh {:dependencies [[org.clojure/core.async "1.3.610"]
+                                  [org.ow2.asm/asm "7.0"]]
+                   :source-paths ["benchmarks/src"]
+                   :resource-paths ["benchmarks/resources"]
+                   :jvm-opts []}}
+  :plugins [[lein-jmh "0.3.0-SNAPSHOT"]]
   :java-source-paths ["src-java"]
   :repl-options {:init-ns bytegeist.dev}
   :global-vars {*warn-on-reflection* true}

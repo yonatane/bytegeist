@@ -5,11 +5,8 @@
 
 (declare spec read write)
 
-#_(defn- append
-  [s fields]
-  (conj s fields))
-
 (defn- override?
+  "Check whether to override a map field if previously defined"
   [field]
   (= :override (first field)))
 
@@ -22,12 +19,14 @@
   (cond-> field (override? field) remove-override-tag))
 
 (defn- map-props
+  "Get the properties of a map spec"
   [s]
   (let [props (nth s 1)]
     (when (map? props)
       props)))
 
 (defn- map-fields
+  "Get the fields of a map spec"
   [s]
   (if (map-props s)
     (nthrest s 2)
@@ -77,7 +76,11 @@
     :else
     (throw (IllegalArgumentException. "Unsupported spec for add-fields"))))
 
+(defprotocol ToSpec
+  (-to-spec [_]))
+
 (defprotocol Spec
+  (-spec? [_])
   (-read [_ b] "Relative read and increment the index")
   (-write [_ b v] "Relative write and increment the index"))
 
@@ -87,6 +90,8 @@
 
 (def bool
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
       (.readBoolean ^ByteBuf b))
@@ -103,6 +108,8 @@
 
 (def int16
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
       (.readShort ^ByteBuf b))
@@ -119,6 +126,8 @@
 
 (def int32
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
       (.readInt ^ByteBuf b))
@@ -127,6 +136,8 @@
 
 (def int64
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
       (.readLong ^ByteBuf b))
@@ -135,6 +146,8 @@
 
 (def double
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
       (.readDouble ^ByteBuf b))
@@ -177,18 +190,20 @@
 
 (defn- length-based-frame-spec [length-spec data-spec]
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
-      (some-> length-spec (read b))
-      (read data-spec b))
+      (some-> length-spec (-read b))
+      (-read data-spec b))
     (-write [_ b v]
       (let [frame-index (.writerIndex ^ByteBuf b)
-            _ (write length-spec b 0)
+            _ (-write length-spec b 0)
             length-length (- (.writerIndex ^ByteBuf b) frame-index)]
         (write data-spec b v)
         (let [data-length (- (.writerIndex ^ByteBuf b) frame-index length-length)]
           (.writerIndex ^ByteBuf b frame-index)
-          (write length-spec b data-length)
+          (-write length-spec b data-length)
           (.writerIndex ^ByteBuf b (+ frame-index length-length data-length)))))))
 
 (defn- compile-field
@@ -206,6 +221,8 @@
         fields-data (map-fields s)
         compiled-fields (mapv compile-field fields-data)
         data-spec (reify
+                    ToSpec
+                    (-to-spec [this] this)
                     MapSpec
                     (-properties [_] props)
                     (-fields [_] compiled-fields)
@@ -214,15 +231,15 @@
                       (into {}
                             (mapcat (fn [[field-name field-props field-spec]]
                                       (if (:inline field-props)
-                                        (read field-spec b)
-                                        [[field-name (read field-spec b)]])))
+                                        (-read field-spec b)
+                                        [[field-name (-read field-spec b)]])))
                             compiled-fields))
                     (-write [_ b v]
                       (run! (fn [[field-name field-props field-spec :as field]]
                               (try
                                 (if (:inline field-props)
-                                  (write field-spec b v)
-                                  (write field-spec b (get v field-name)))
+                                  (-write field-spec b v)
+                                  (-write field-spec b (get v field-name)))
                                 (catch Exception e
                                   (throw (ex-info "Failed write" {:field field :v v} e)))))
                             compiled-fields)))]
@@ -240,68 +257,74 @@
       (reify
         Spec
         (-read [_ b]
-          (let [len (- (read length-spec b) adjust)]
+          (let [len (- (-read length-spec b) adjust)]
             (if (< len 0)
               nil
-              (into {} (repeatedly len #(vector (read k-spec b) (read v-spec b)))))))
+              (into {} (repeatedly len #(vector (-read k-spec b) (-read v-spec b)))))))
         (-write [_ b m]
           (if (nil? m)
-            (write length-spec b (dec adjust))
+            (-write length-spec b (dec adjust))
             (do (write length-spec b (+ (count m) adjust))
                 (run! (fn [[k v]]
-                        (write k-spec b k)
-                        (write v-spec b v))
+                        (-write k-spec b k)
+                        (-write v-spec b v))
                       m)))))
       (reify
         Spec
         (-read [_ b]
           (let [len length]
-            (into {} (repeatedly len #(vector (read k-spec b) (read v-spec b))))))
+            (into {} (repeatedly len #(vector (-read k-spec b) (-read v-spec b))))))
         (-write [_ b m]
           (run! (fn [[k v]]
-                  (write k-spec b k)
-                  (write v-spec b v))
+                  (-write k-spec b k)
+                  (-write v-spec b v))
                 m))))))
 
 (defn tuple-spec
   [s]
   (let [specs (mapv spec (rest s))]
     (reify
+      ToSpec
+      (-to-spec [this] this)
       Spec
       (-read [_ b]
-        (mapv (fn [item-spec] (read item-spec b)) specs))
+        (mapv (fn [item-spec] (-read item-spec b)) specs))
       (-write [_ b v]
         (loop [i 0]
           (when (< i (count specs))
             (let [item-spec (nth specs i) item (nth v i)]
-              (write item-spec b item)
+              (-write item-spec b item)
               (recur (inc i)))))))))
 
 (defn fixed-length-vector-spec
   [length item-spec]
   (let [item-spec (spec item-spec)]
     (reify
+      ToSpec
+      (-to-spec [this] this)
       Spec
       (-read [_ b]
-        (vec (repeatedly length #(read item-spec ^ByteBuf b))))
+        (vec (repeatedly length #(-read item-spec ^ByteBuf b))))
       (-write [_ b v]
-        (run! #(write item-spec b %) v)))))
+        (run! #(-write item-spec b %) v)))))
 
 (defn length-delimited-vector-spec
   [delimiter-spec item-spec adjust]
   (let [adjust (or adjust 0)]
     (reify
+      ToSpec
+      (-to-spec [this] this)
       Spec
       (-read [_ b]
-        (let [len (- (read delimiter-spec b) adjust)]
+        (let [len (- (-read delimiter-spec b) adjust)]
           (if (< len 0)
             nil
-            (vec (repeatedly len #(read item-spec ^ByteBuf b))))))
+            (vec (repeatedly len #(-read item-spec ^ByteBuf b))))))
       (-write [_ b v]
         (if (nil? v)
           (write delimiter-spec b (dec adjust))
           (do (write delimiter-spec b (+ (count v) adjust))
-              (run! #(write item-spec b %) v)))))))
+              (run! #(-write item-spec b %) v)))))))
 
 (defn vector-spec
   [[_ {:keys [length adjust]} item-spec]]
@@ -333,6 +356,8 @@
 (defn- fixed-length-spec
   [length read write]
   (reify
+    ToSpec
+    (-to-spec [this] this)
     Spec
     (-read [_ b]
       (read b length))
@@ -351,33 +376,37 @@
   [delimiter-spec adjust]
   (let [adjust (or adjust 0)]
     (reify
+      ToSpec
+      (-to-spec [this] this)
       Spec
       (-read [_ b]
-        (let [length (- (read delimiter-spec b) adjust)]
+        (let [length (- (-read delimiter-spec b) adjust)]
           (if (< length 0)
             nil
             (read-bytes b length))))
       (-write [_ b byts]
         (if (nil? byts)
           (write delimiter-spec ^ByteBuf b (dec adjust))
-          (do (write delimiter-spec ^ByteBuf b (+ (alength (bytes byts)) adjust))
+          (do (-write delimiter-spec ^ByteBuf b (+ (alength (bytes byts)) adjust))
               (write-bytes b byts)))))))
 
 (defn- length-delimited-string-spec
   [delimiter-spec adjust]
   (let [adjust (or adjust 0)]
     (reify
+      ToSpec
+      (-to-spec [this] this)
       Spec
       (-read [_ b]
-        (let [length (- (read delimiter-spec b) adjust)]
+        (let [length (- (-read delimiter-spec b) adjust)]
           (if (< length 0)
             nil
             (read-string b length))))
       (-write [_ b v]
         (if (nil? v)
-          (write delimiter-spec ^ByteBuf b (dec adjust))
+          (-write delimiter-spec ^ByteBuf b (dec adjust))
           (let [byts (.getBytes ^String v StandardCharsets/UTF_8)]
-            (write delimiter-spec ^ByteBuf b (+ (alength byts) adjust))
+            (-write delimiter-spec ^ByteBuf b (+ (alength byts) adjust))
             (write-bytes b byts)))))))
 
 (defn- length-spec-compiler
@@ -414,14 +443,16 @@
         initial-reader (spec (into [:map first-spec-props] fields-upto-dispatch))
         dispatch-f (if (keyword? dispatch) (comp dispatch-fn dispatch) #(dispatch-fn (mapv % dispatch)))]
     (reify
+      ToSpec
+      (-to-spec [this] this)
       Spec
       (-read [_ b]
         (let [mark (.readerIndex ^ByteBuf b)
-              initial (read initial-reader b)
+              initial (-read initial-reader b)
               _ (.readerIndex ^ByteBuf b mark)
               dispatch-val (dispatch-f initial)]
           (if-some [matched (get cases dispatch-val)]
-            (read matched b)
+            (-read matched b)
             (throw (ex-info "Invalid dispatch value" {:dispatch-options (vals cases)
                                                       :dispatch-value dispatch-val})))))
 
@@ -466,22 +497,41 @@
         f (or (get f-registry shape) (throw (ex-info "Unknown spec" {:input s})))]
     (f s)))
 
-(defn spec [s]
-  (cond
-    (satisfies? Spec s)
-    s
-
-    (keyword? s)
-    (or (get registry s) (throw (ex-info "Unknown spec" {:input s})))
-
-    (vector? s)
-    (compile-spec-vector s)
-
-    :else
+(extend-protocol ToSpec
+  clojure.lang.Keyword
+  (-to-spec [s]
+    (or (get registry s) (throw (ex-info "Unknown spec" {:input s}))))
+  clojure.lang.IPersistentVector
+  (-to-spec [s]
+    (compile-spec-vector s))
+  Object
+  (-to-spec [s]
     (throw (ex-info "Unsupported spec input type" {:input s}))))
 
+(defn spec [s]
+  (-to-spec s)
+  #_(cond
+      (satisfies? Spec s)
+      s
+
+      (keyword? s)
+      (or (get registry s) (throw (ex-info "Unknown spec" {:input s})))
+
+      (vector? s)
+      (compile-spec-vector s)
+
+      :else
+      (throw (ex-info "Unsupported spec input type" {:input s}))))
+
 (defn read [s b]
-  (-read (spec s) b))
+  (-read (-to-spec s) b))
+
+(defn read-inline
+  {:inline (fn [s b] `(-read (-to-spec ~s) ~b))}
+  [s b]
+  (-read (-to-spec s) b))
+
 
 (defn write [s b v]
-  (-write (spec s) b v))
+  (-write (-to-spec s) b v))
+

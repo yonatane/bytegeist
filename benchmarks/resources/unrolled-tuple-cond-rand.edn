@@ -1,0 +1,68 @@
+;; Here we will randomly pick a spec in each invocation
+{:benchmarks
+ [{:name :unrolled-tuple-cond-rand
+   :fn bytegeist.bytegeist/-read
+   :args [:state/rand-unrolled-tuple :state/buf]}
+
+  {:name :unrolled-n-tuple-cond
+   :fn bytegeist.bytegeist/-read
+   :args [:state/unrolled-n-tuple :state/buf]}
+
+  {:name :unrolled-5-tuple-cond
+   :fn bytegeist.bytegeist/-read
+   :args [:state/unrolled-5-tuple :state/buf]}]
+
+  ;{:name :rolled-tuple
+  ; :fn bytegeist.bytegeist/-read
+  ; :args [:state/rand-rolled-tuple :state/buf]}]
+
+ :params
+ {:tuples [[[:tuple :long]
+            [:tuple :long :double]
+            [:tuple :long :double :int]
+            [:tuple :long :double :int :int24]]]
+  :five-tuple [[:tuple :long :double :int :int24 :short]]
+  :n [0 1 2 3]
+  :v [[0 1.5 2 3 4]]
+  :init-tuple [[:tuple :long :double :int :int24 :short]]
+  :buf-size 40}
+
+ :states
+ {:unrolled-tuples
+  {:fn bytegeist.jmh.misc/compile-tuple-cond-specs
+   :args [:param/tuples]}
+
+  :rolled-tuples
+  {:fn bytegeist.jmh.misc/compile-rolled-tuple-specs
+   :args [:param/tuples]}
+
+  :rand-unrolled-tuple
+  {:invocation {:fn bytegeist.jmh.misc/rand-spec
+                :args [:state/unrolled-tuples]}}
+
+  :rand-rolled-tuple
+  {:invocation {:fn bytegeist.jmh.misc/rand-spec
+                :args [:state/rolled-tuples]}}
+
+  :unrolled-n-tuple
+  {:fn (fn [tuples n] (nth tuples n))
+   :args [:state/unrolled-tuples :param/n]}
+
+  :unrolled-5-tuple
+  {:fn bytegeist.jmh.misc/unrolled-tuple-cond
+   :args [:param/five-tuple]}
+
+  :init-tuple
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/init-tuple]}
+
+  :buf
+  {:scope :thread
+   :setup {:fn bytegeist.jmh.misc/prepare-buf
+           :args [:param/buf-size :state/init-tuple :param/v]}
+   :invocation {:teardown {:fn bytegeist.jmh.misc/reset-reader}}}}
+
+ :options
+ {:jmh/default {:fork {:count 1}
+                :measurement {:iterations 1}
+                :mode [:throughput]}}}

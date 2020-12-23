@@ -1,0 +1,136 @@
+{:benchmarks
+ [;; Baseline of nothing
+  {:name :baseline
+   :fn bytegeist.jmh.misc/baseline
+   :options [{:warmup {:iterations 2}
+              :measurement {:iterations 1}}]}
+
+  ;; Read a known 3-tuple of longs
+  {:name :read
+   :fn bytegeist.bytegeist/read
+   :args [:state/tuple :state/buf]}
+
+  {:name :read-direct
+   :fn bytegeist.bytegeist/-read
+   :args [:state/tuple :state/buf]}
+
+  {:name :rolled-2-tuple
+   :fn bytegeist.bytegeist/read
+   :args [:state/rolled-2-tuple :state/buf]}
+
+  {:name :slow-tuple
+   :fn bytegeist.bytegeist/read
+   :args [:state/slow-tuple :state/buf]}
+
+  {:name :slow-tuple-direct
+   :fn bytegeist.bytegeist/-read
+   :args [:state/slow-tuple :state/buf]}
+
+  {:name :read-read
+   :fn bytegeist.jmh.misc/read-read
+   :args [:jmh/blackhole :state/spec :state/spec2 :state/buf24]
+   :void true}
+
+  {:name :read-read-direct
+   :fn bytegeist.jmh.misc/read-read-direct
+   :args [:jmh/blackhole :state/spec :state/spec2 :state/buf24]
+   :void true}
+
+  {:name :read-read-read
+   :fn bytegeist.jmh.misc/read-read-read
+   :args [:jmh/blackhole :state/spec :state/spec2 :state/spec3 :state/buf24]
+   :void true}
+
+  {:name :read-3x-inline
+   :fn bytegeist.jmh.misc/read-3x-inline
+   :args [:jmh/blackhole :state/spec :state/spec2 :state/spec3 :state/buf24]
+   :void true}
+
+  {:name :read-3x-direct-to-spec
+   :fn bytegeist.jmh.misc/read-3x-direct-to-spec
+   :args [:jmh/blackhole :state/spec :state/spec2 :state/spec3 :state/buf24]
+   :void true}
+
+  {:name :read-read-read-direct
+   :fn bytegeist.jmh.misc/read-read-read-direct
+   :args [:jmh/blackhole :state/spec :state/spec2 :state/spec3 :state/buf24]
+   :void true}]
+
+ :params
+ {:spec [:long :double :int]
+  :spec2 [:long :double :int]
+  :spec3 [:long :double :int]
+  :tuple [[:tuple :long :long :long]
+          [:tuple :long :long :int]
+          [:tuple :long :int :short]]
+  :tuple-2 [[:tuple :long :long]
+            [:tuple :double :double]
+            [:tuple :long :double]]
+  :v-tuple-2 [[1 2]]
+  :tuple-3-longs [[:tuple :long :long :long]]
+  :v [[1 2 3]]
+  :buf-size 24}
+
+ :states
+ {:tuple
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/tuple]}
+
+  :slow-tuple
+  {:fn bytegeist.jmh.misc/slow-tuple
+   :args [:param/tuple]}
+
+  :spec
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/spec]}
+
+  :spec2
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/spec2]}
+
+  :spec3
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/spec3]}
+
+  :tuple-2
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/tuple-2]}
+
+  :rolled-2-tuple
+  {:fn bytegeist.jmh.misc/rolled-tuple
+   :args [:param/tuple-2]}
+
+  :tuple-3-longs
+  {:fn bytegeist.bytegeist/spec
+   :args [:param/tuple-3-longs]}
+
+  :buf24
+  {:scope :thread
+   :setup {:fn bytegeist.jmh.misc/prepare-buf
+           :args [:param/buf-size :state/tuple-3-longs :param/v]}
+   :invocation {:teardown {:fn bytegeist.jmh.misc/reset-reader}}}
+
+  :buf-2-tuple
+  {:scope :thread
+   :setup {:fn bytegeist.jmh.misc/prepare-buf
+           :args [:param/buf-size :state/tuple-2 :param/v-2-tuple]}
+   :invocation {:teardown {:fn bytegeist.jmh.misc/reset-reader}}}
+
+  :buf
+  {:scope :thread
+   :setup {:fn bytegeist.jmh.misc/prepare-buf
+           :args [:param/buf-size :state/tuple :param/v]}
+   :invocation {:teardown {:fn bytegeist.jmh.misc/reset-reader}}}}
+
+ :selectors
+ {:rolled-2-tuple (comp #{:rolled-2-tuple} :name)
+  :read-read (comp #{:read-read :read-read-direct} :name)
+  :read-read-read (comp #{:read-read-read :read-read-read-direct} :name)
+  :read-3x-inline (comp #{:read-3x-inline} :name)
+  :read-3x-direct-to-spec (comp #{:read-3x-direct-to-spec} :name)}
+ ;:reads (comp (fn [str] (clojure.string/starts-with? str "read-read")) name :name)}
+
+ :options
+ {:jmh/default {:fork {:count 1}
+                :measurement {:iterations 1}
+                :mode [:throughput]}}}

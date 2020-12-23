@@ -19,6 +19,7 @@
   (cond-> field (override? field) remove-override-tag))
 
 (defn- map-props
+  "Get the properties of a map spec"
   [s]
   (let [props (nth s 1)]
     (when (map? props)
